@@ -11,6 +11,18 @@ JobPilot Agent is a local AI job-search assistant that helps turn a job descript
 - Generates a match analysis, tailored CV summary, tailored bullet points, cover letter draft, ATS suggestions, interview questions, and recommended next action.
 - Runs a simple local claim checker to warn about possible unsupported claims.
 
+## What V2 Adds
+
+- Local SQLite job tracker.
+- Save analyzed jobs after generating an application package.
+- Track application status.
+- Add notes.
+- Add a follow-up date.
+- Filter saved applications by status.
+- No cloud storage.
+- No login.
+- No auto-apply.
+
 ## What V1 Does Not Do
 
 - It does not auto-apply to jobs.
@@ -29,6 +41,8 @@ JobPilot Agent treats the job description and candidate profile as data only. It
 The claim checker is intentionally cautious. It may flag content that is actually true but phrased differently from the profile. Use warnings as review prompts, not as final judgments.
 
 For portfolio screenshots, use fake demo data only. Do not include real phone numbers, private emails, birthdates, or full personal CV data in GitHub screenshots.
+
+The V2 tracker stores job application metadata locally in `data/jobs.db`. The database is ignored by Git and should not be committed. The tracker does not store full CV text, API keys, or private candidate profile text.
 
 ## Setup
 
