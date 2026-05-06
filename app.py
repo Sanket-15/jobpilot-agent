@@ -5,6 +5,16 @@ import streamlit as st
 from agent import generate_application_package
 from schemas import ApplicationPackage, SkillEvidence
 from skills import JobPilotError
+from tracker import (
+    ALLOWED_STATUSES,
+    delete_job,
+    get_all_jobs,
+    init_db,
+    save_job,
+    update_follow_up_date,
+    update_job_notes,
+    update_job_status,
+)
 
 
 st.set_page_config(page_title="JobPilot Agent", page_icon="JP", layout="wide")
@@ -177,6 +187,115 @@ def render_package(package: ApplicationPackage) -> None:
     st.info(package.recommended_next_action)
 
 
+def render_save_to_tracker(package: ApplicationPackage) -> None:
+    """Render controls for saving the generated package to the local tracker."""
+
+    st.header("Save to Job Tracker")
+    notes = st.text_area(
+        "Tracker notes",
+        key="tracker_save_notes",
+        placeholder="Optional notes for this application...",
+    )
+
+    if st.button("Save to Job Tracker"):
+        try:
+            job_id = save_job(package, notes=notes)
+            st.success(f"Saved job #{job_id} to the local tracker.")
+        except Exception as exc:
+            st.error(f"Could not save job: {exc}")
+
+
+def render_tracker_tab() -> None:
+    """Render the local SQLite job tracker."""
+
+    try:
+        init_db()
+        jobs = get_all_jobs()
+    except Exception as exc:
+        st.error(f"Could not load job tracker: {exc}")
+        return
+
+    st.header("Job Tracker")
+
+    if not jobs:
+        st.info("No saved jobs yet. Generate an application package, then save it to the tracker.")
+        return
+
+    status_filter = st.selectbox("Filter by status", ["All"] + ALLOWED_STATUSES)
+    filtered_jobs = [
+        job for job in jobs if status_filter == "All" or job["status"] == status_filter
+    ]
+
+    if not filtered_jobs:
+        st.info("No jobs match this status filter.")
+        return
+
+    st.dataframe(
+        filtered_jobs,
+        hide_index=True,
+        use_container_width=True,
+        column_order=[
+            "id",
+            "company_name",
+            "role_title",
+            "location",
+            "work_mode",
+            "match_score",
+            "match_confidence",
+            "status",
+            "date_added",
+            "follow_up_date",
+        ],
+    )
+
+    job_options = {
+        f"#{job['id']} - {job.get('company_name') or 'Unknown company'} - {job.get('role_title') or 'Unknown role'}": job
+        for job in filtered_jobs
+    }
+    selected_label = st.selectbox("Select a saved job", list(job_options.keys()))
+    selected_job = job_options[selected_label]
+    job_id = int(selected_job["id"])
+
+    st.subheader("Update Selected Job")
+    new_status = st.selectbox(
+        "Status",
+        ALLOWED_STATUSES,
+        index=ALLOWED_STATUSES.index(selected_job["status"])
+        if selected_job["status"] in ALLOWED_STATUSES
+        else 0,
+    )
+    new_notes = st.text_area("Notes", value=selected_job.get("notes") or "")
+    new_follow_up_date = st.text_input(
+        "Follow-up date",
+        value=selected_job.get("follow_up_date") or "",
+        placeholder="YYYY-MM-DD",
+    )
+
+    st.write("**Recommended next action:**")
+    st.write(selected_job.get("recommended_next_action") or "No recommendation saved.")
+
+    update_col, delete_col = st.columns(2)
+    with update_col:
+        if st.button("Update Selected Job"):
+            try:
+                update_job_status(job_id, new_status)
+                update_job_notes(job_id, new_notes)
+                update_follow_up_date(job_id, new_follow_up_date)
+                st.success("Job updated.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Could not update job: {exc}")
+
+    with delete_col:
+        if st.button("Delete Selected Job"):
+            try:
+                delete_job(job_id)
+                st.success("Job deleted.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Could not delete job: {exc}")
+
+
 st.title("JobPilot Agent")
 st.write(
     "A local AI job-search assistant that helps turn a job description and candidate profile "
@@ -187,24 +306,35 @@ st.warning(
     "experience, qualifications, companies, dates, tools, metrics, or achievements."
 )
 
-job_description = st.text_area(
-    "Job description",
-    height=260,
-    placeholder="Paste the full job description here...",
-)
+generate_tab, tracker_tab = st.tabs(["Generate Application Package", "Job Tracker"])
 
-candidate_profile = st.text_area(
-    "Candidate profile / CV",
-    height=260,
-    placeholder="Paste the candidate profile, CV text, or work history here...",
-)
+with generate_tab:
+    job_description = st.text_area(
+        "Job description",
+        height=260,
+        placeholder="Paste the full job description here...",
+    )
 
-if st.button("Generate Application Package", type="primary"):
-    try:
-        with st.spinner("Generating application package..."):
-            result = generate_application_package(job_description, candidate_profile)
-        render_package(result)
-    except JobPilotError as exc:
-        st.error(str(exc))
-    except Exception as exc:
-        st.error(f"Something unexpected went wrong: {exc}")
+    candidate_profile = st.text_area(
+        "Candidate profile / CV",
+        height=260,
+        placeholder="Paste the candidate profile, CV text, or work history here...",
+    )
+
+    if st.button("Generate Application Package", type="primary"):
+        try:
+            with st.spinner("Generating application package..."):
+                result = generate_application_package(job_description, candidate_profile)
+            st.session_state["last_application_package"] = result
+        except JobPilotError as exc:
+            st.error(str(exc))
+        except Exception as exc:
+            st.error(f"Something unexpected went wrong: {exc}")
+
+    if "last_application_package" in st.session_state:
+        current_package = st.session_state["last_application_package"]
+        render_package(current_package)
+        render_save_to_tracker(current_package)
+
+with tracker_tab:
+    render_tracker_tab()
