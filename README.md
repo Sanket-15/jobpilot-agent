@@ -23,6 +23,17 @@ JobPilot Agent is a local AI job-search assistant that helps turn a job descript
 - No login.
 - No auto-apply.
 
+## What V3 Adds
+
+- Profile memory.
+- Save a candidate profile locally.
+- Reuse a saved profile for future job applications.
+- Edit and delete saved profiles.
+- Local SQLite storage only.
+- No cloud storage.
+- No login.
+- No auto-apply.
+
 ## What V1 Does Not Do
 
 - It does not auto-apply to jobs.
@@ -42,7 +53,7 @@ The claim checker is intentionally cautious. It may flag content that is actuall
 
 For portfolio screenshots, use fake demo data only. Do not include real phone numbers, private emails, birthdates, or full personal CV data in GitHub screenshots.
 
-The V2 tracker stores job application metadata locally in `data/jobs.db`. The database is ignored by Git and should not be committed. The tracker does not store full CV text, API keys, or private candidate profile text.
+The app stores job tracker metadata and saved candidate profiles locally in `data/jobs.db`. The database is ignored by Git and should not be committed. Saved profiles may contain personal data, so keep `data/jobs.db` private. The app does not store API keys in the database.
 
 ## Setup
 

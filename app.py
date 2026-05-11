@@ -3,6 +3,14 @@
 import streamlit as st
 
 from agent import generate_application_package
+from profile_store import (
+    delete_profile,
+    get_all_profiles,
+    get_profile_by_id,
+    init_profile_db,
+    save_profile,
+    update_profile,
+)
 from schemas import ApplicationPackage, SkillEvidence
 from skills import JobPilotError
 from tracker import (
@@ -296,6 +304,140 @@ def render_tracker_tab() -> None:
                 st.error(f"Could not delete job: {exc}")
 
 
+def render_profile_memory_tab() -> None:
+    """Render saved candidate profile controls."""
+
+    try:
+        init_profile_db()
+        profiles = get_all_profiles()
+    except Exception as exc:
+        st.error(f"Could not load profile memory: {exc}")
+        return
+
+    st.header("Profile Memory")
+    st.info("Saved profiles are stored locally only in data/jobs.db. You can delete them at any time.")
+
+    with st.form("create_profile_form"):
+        st.subheader("Create Profile")
+        profile_name = st.text_input("Profile name")
+        candidate_name = st.text_input("Candidate name")
+        target_roles = st.text_input("Target roles")
+        preferred_locations = st.text_input("Preferred locations")
+        profile_text = st.text_area("Profile text / CV text", height=260)
+        submitted = st.form_submit_button("Save Profile")
+
+        if submitted:
+            try:
+                profile_id = save_profile(
+                    profile_name=profile_name,
+                    candidate_name=candidate_name,
+                    target_roles=target_roles,
+                    preferred_locations=preferred_locations,
+                    profile_text=profile_text,
+                )
+                st.success(f"Saved profile #{profile_id}.")
+                st.rerun()
+            except ValueError as exc:
+                st.warning(str(exc))
+            except Exception as exc:
+                st.error(f"Could not save profile: {exc}")
+
+    st.subheader("Saved Profiles")
+    if not profiles:
+        st.info("No saved profiles yet.")
+        return
+
+    st.dataframe(
+        [
+            {
+                "id": profile["id"],
+                "profile_name": profile["profile_name"],
+                "candidate_name": profile["candidate_name"],
+                "target_roles": profile["target_roles"],
+                "preferred_locations": profile["preferred_locations"],
+                "date_updated": profile["date_updated"],
+            }
+            for profile in profiles
+        ],
+        hide_index=True,
+        use_container_width=True,
+    )
+
+    profile_options = {
+        f"#{profile['id']} - {profile['profile_name']}": profile for profile in profiles
+    }
+    selected_label = st.selectbox("Select a saved profile", list(profile_options.keys()))
+    selected_profile = profile_options[selected_label]
+    selected_profile_id = int(selected_profile["id"])
+
+    with st.form("edit_profile_form"):
+        st.subheader("Edit Selected Profile")
+        edit_profile_name = st.text_input(
+            "Profile name",
+            value=selected_profile.get("profile_name") or "",
+            key="edit_profile_name",
+        )
+        edit_candidate_name = st.text_input(
+            "Candidate name",
+            value=selected_profile.get("candidate_name") or "",
+            key="edit_candidate_name",
+        )
+        edit_target_roles = st.text_input(
+            "Target roles",
+            value=selected_profile.get("target_roles") or "",
+            key="edit_target_roles",
+        )
+        edit_preferred_locations = st.text_input(
+            "Preferred locations",
+            value=selected_profile.get("preferred_locations") or "",
+            key="edit_preferred_locations",
+        )
+        edit_profile_text = st.text_area(
+            "Profile text / CV text",
+            value=selected_profile.get("profile_text") or "",
+            height=260,
+            key="edit_profile_text",
+        )
+
+        update_clicked = st.form_submit_button("Update Profile")
+        if update_clicked:
+            try:
+                update_profile(
+                    profile_id=selected_profile_id,
+                    profile_name=edit_profile_name,
+                    candidate_name=edit_candidate_name,
+                    target_roles=edit_target_roles,
+                    preferred_locations=edit_preferred_locations,
+                    profile_text=edit_profile_text,
+                )
+                st.success("Profile updated.")
+                st.rerun()
+            except ValueError as exc:
+                st.warning(str(exc))
+            except Exception as exc:
+                st.error(f"Could not update profile: {exc}")
+
+    if st.button("Delete Selected Profile"):
+        try:
+            delete_profile(selected_profile_id)
+            st.success("Profile deleted.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Could not delete profile: {exc}")
+
+
+def load_selected_profile_into_editor(profile_id: int) -> None:
+    """Load a saved profile into the editable generation text area."""
+
+    profile = get_profile_by_id(profile_id)
+    if not profile:
+        st.warning("Selected profile could not be loaded.")
+        return
+
+    st.session_state["candidate_profile_input"] = profile.get("profile_text") or ""
+    st.session_state["loaded_profile_id"] = profile_id
+
+
 st.title("JobPilot Agent")
 st.write(
     "A local AI job-search assistant that helps turn a job description and candidate profile "
@@ -306,7 +448,9 @@ st.warning(
     "experience, qualifications, companies, dates, tools, metrics, or achievements."
 )
 
-generate_tab, tracker_tab = st.tabs(["Generate Application Package", "Job Tracker"])
+generate_tab, tracker_tab, profile_tab = st.tabs(
+    ["Generate Application Package", "Job Tracker", "Profile Memory"]
+)
 
 with generate_tab:
     job_description = st.text_area(
@@ -315,8 +459,42 @@ with generate_tab:
         placeholder="Paste the full job description here...",
     )
 
+    try:
+        init_profile_db()
+        saved_profiles = get_all_profiles()
+    except Exception as exc:
+        saved_profiles = []
+        st.error(f"Could not load saved profiles: {exc}")
+
+    profile_mode = st.radio(
+        "Candidate profile source",
+        ["Use saved profile", "Paste profile manually"],
+        horizontal=True,
+        index=0 if saved_profiles else 1,
+    )
+
+    if profile_mode == "Use saved profile":
+        if saved_profiles:
+            profile_options = {
+                f"#{profile['id']} - {profile['profile_name']}": profile["id"]
+                for profile in saved_profiles
+            }
+            selected_profile_label = st.selectbox(
+                "Saved profile",
+                list(profile_options.keys()),
+            )
+            selected_profile_id = int(profile_options[selected_profile_label])
+
+            if st.button("Load Saved Profile"):
+                load_selected_profile_into_editor(selected_profile_id)
+        else:
+            st.info(
+                "No saved profiles yet. You can paste a profile manually or create one in Profile Memory."
+            )
+
     candidate_profile = st.text_area(
         "Candidate profile / CV",
+        key="candidate_profile_input",
         height=260,
         placeholder="Paste the candidate profile, CV text, or work history here...",
     )
@@ -338,3 +516,6 @@ with generate_tab:
 
 with tracker_tab:
     render_tracker_tab()
+
+with profile_tab:
+    render_profile_memory_tab()
