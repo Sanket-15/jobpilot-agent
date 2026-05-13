@@ -65,6 +65,18 @@ JobPilot must not invent experience, companies, dates, tools, certifications, me
 - Review/edit before saving.
 - Save to Profile Memory.
 
+### V7 - Resume Translator / Localization
+
+- Paste English/German CV or profile text.
+- Localize to English or German.
+- Choose the target market.
+- Review/edit before saving.
+- Save localized version to Profile Memory.
+- No file upload yet.
+- No scraping.
+- No cloud storage.
+- No auto-apply.
+
 ## How It Works
 
 1. Paste or select a profile.
@@ -102,6 +114,7 @@ jobpilot-agent/
 ├── export_utils.py
 ├── ats_scanner.py
 ├── profile_normalizer.py
+├── resume_localizer.py
 ├── requirements.txt
 ├── .env.example
 ├── .gitignore
@@ -153,6 +166,8 @@ streamlit run app.py
 - `data/jobs.db` is ignored by Git.
 - `.env` is ignored by Git.
 - API keys should never be committed.
+- Localized profiles may contain personal data.
+- Localized profiles are saved locally in `data/jobs.db` only when the user clicks Save Localized Profile to Profile Memory.
 - Generated content must be reviewed by the user.
 - Only add keywords or claims if they reflect real experience.
 - No auto-apply.
@@ -173,7 +188,6 @@ Do not use real phone numbers, private emails, birthdates, or full personal CV d
 
 ## Roadmap
 
-- V7 Resume Translator / Localization
 - V8 Job URL Import with safe fallback
 - V9 Job Discovery using safe APIs
 - V10 Mock Interview Mode

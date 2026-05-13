@@ -108,6 +108,24 @@ class NormalizedProfile(BaseModel):
     normalized_profile_text: str
 
 
+class LocalizedResume(BaseModel):
+    """Localized resume/profile text for a target language and market."""
+
+    detected_source_language: str
+    target_language: str
+    target_market: str
+    tone: str
+    localized_professional_summary: str
+    localized_skills: list[str]
+    localized_experience_bullets: list[str]
+    localized_education: list[str]
+    localized_certifications: list[str]
+    localized_projects: list[str]
+    localization_notes: list[str]
+    unsupported_or_unclear_claim_warnings: list[str]
+    localized_profile_text: str
+
+
 class ClaimsCheck(BaseModel):
     """Unsupported claim warnings."""
 
