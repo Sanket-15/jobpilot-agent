@@ -3,6 +3,7 @@
 import streamlit as st
 
 from agent import generate_application_package
+from ats_scanner import run_ats_scan
 from export_utils import (
     application_package_to_markdown,
     application_package_to_text,
@@ -16,7 +17,7 @@ from profile_store import (
     save_profile,
     update_profile,
 )
-from schemas import ApplicationPackage, SkillEvidence
+from schemas import ATSScanResult, ApplicationPackage, SkillEvidence
 from skills import JobPilotError
 from tracker import (
     ALLOWED_STATUSES,
@@ -248,6 +249,50 @@ def render_export_section(package: ApplicationPackage) -> None:
         )
 
 
+def render_ats_scan_result(result: ATSScanResult) -> None:
+    """Render dedicated ATS scanner results."""
+
+    st.header("ATS Scan Results")
+    st.metric("ATS score", f"{result.ats_score}/100")
+    st.write(f"**Match confidence:** {result.match_confidence}")
+    st.warning("Only add keywords or claims to your CV if they reflect your real experience.")
+
+    st.subheader("Supported keywords")
+    render_list(result.supported_keywords)
+
+    st.subheader("Missing keywords")
+    render_list(result.missing_keywords)
+    if result.missing_keywords:
+        st.caption("Only add missing keywords to your CV if you have real experience with them.")
+
+    st.subheader("Needs clarification keywords")
+    render_list(result.needs_clarification_keywords)
+
+    st.subheader("Keyword improvement suggestions")
+    render_list(result.keyword_improvement_suggestions)
+
+    st.subheader("Weak bullet point suggestions")
+    render_list(result.weak_bullet_point_suggestions)
+
+    st.subheader("Formatting risks")
+    render_list(result.formatting_risks)
+
+    st.subheader("Overused phrases")
+    render_list(result.overused_phrases)
+
+    st.subheader("Suggested skills ordering")
+    render_list(result.suggested_skills_ordering)
+
+    st.subheader("Top 5 CV improvements")
+    render_list(result.top_cv_improvements[:5])
+
+    st.subheader("Unsupported / risky claim warnings")
+    render_warning_list(result.unsupported_or_risky_claims)
+
+    st.subheader("Recommended next action")
+    st.info(result.recommended_next_action)
+
+
 def render_tracker_tab() -> None:
     """Render the local SQLite job tracker."""
 
@@ -461,7 +506,7 @@ def render_profile_memory_tab() -> None:
             st.error(f"Could not delete profile: {exc}")
 
 
-def load_selected_profile_into_editor(profile_id: int) -> None:
+def load_selected_profile_into_editor(profile_id: int, target_key: str = "candidate_profile_input") -> None:
     """Load a saved profile into the editable generation text area."""
 
     profile = get_profile_by_id(profile_id)
@@ -469,8 +514,84 @@ def load_selected_profile_into_editor(profile_id: int) -> None:
         st.warning("Selected profile could not be loaded.")
         return
 
-    st.session_state["candidate_profile_input"] = profile.get("profile_text") or ""
+    st.session_state[target_key] = profile.get("profile_text") or ""
     st.session_state["loaded_profile_id"] = profile_id
+
+
+def render_profile_source_controls(target_key: str, context_label: str) -> None:
+    """Render saved-profile/manual-paste controls for a profile text area."""
+
+    try:
+        init_profile_db()
+        saved_profiles = get_all_profiles()
+    except Exception as exc:
+        saved_profiles = []
+        st.error(f"Could not load saved profiles: {exc}")
+
+    profile_mode = st.radio(
+        f"{context_label} profile source",
+        ["Use saved profile", "Paste profile manually"],
+        horizontal=True,
+        index=0 if saved_profiles else 1,
+        key=f"{target_key}_mode",
+    )
+
+    if profile_mode == "Use saved profile":
+        if saved_profiles:
+            profile_options = {
+                f"#{profile['id']} - {profile['profile_name']}": profile["id"]
+                for profile in saved_profiles
+            }
+            selected_profile_label = st.selectbox(
+                "Saved profile",
+                list(profile_options.keys()),
+                key=f"{target_key}_saved_profile",
+            )
+            selected_profile_id = int(profile_options[selected_profile_label])
+
+            if st.button("Load Saved Profile", key=f"{target_key}_load_saved_profile"):
+                load_selected_profile_into_editor(selected_profile_id, target_key=target_key)
+        else:
+            st.info(
+                "No saved profiles yet. You can paste a profile manually or create one in Profile Memory."
+            )
+
+
+def render_ats_scanner_tab() -> None:
+    """Render the dedicated ATS scanner mode."""
+
+    st.header("ATS Scanner")
+    st.write("Paste a job description and CV/profile to scan keyword fit, gaps, and resume clarity.")
+    st.warning("Only add keywords or claims to your CV if they reflect your real experience.")
+
+    ats_job_description = st.text_area(
+        "ATS job description",
+        height=260,
+        placeholder="Paste the target job description here...",
+        key="ats_job_description_input",
+    )
+
+    render_profile_source_controls("ats_candidate_profile_input", "ATS scanner")
+
+    ats_candidate_profile = st.text_area(
+        "Resume / CV text",
+        key="ats_candidate_profile_input",
+        height=260,
+        placeholder="Paste the resume, CV text, or candidate profile here...",
+    )
+
+    if st.button("Run ATS Scan", type="primary"):
+        try:
+            with st.spinner("Running ATS scan..."):
+                result = run_ats_scan(ats_job_description, ats_candidate_profile)
+            st.session_state["latest_ats_scan_result"] = result
+        except JobPilotError as exc:
+            st.error(str(exc))
+        except Exception as exc:
+            st.error(f"Something unexpected went wrong during the ATS scan: {exc}")
+
+    if "latest_ats_scan_result" in st.session_state:
+        render_ats_scan_result(st.session_state["latest_ats_scan_result"])
 
 
 st.title("JobPilot Agent")
@@ -483,8 +604,8 @@ st.warning(
     "experience, qualifications, companies, dates, tools, metrics, or achievements."
 )
 
-generate_tab, tracker_tab, profile_tab = st.tabs(
-    ["Generate Application Package", "Job Tracker", "Profile Memory"]
+generate_tab, ats_tab, tracker_tab, profile_tab = st.tabs(
+    ["Generate Application Package", "ATS Scanner", "Job Tracker", "Profile Memory"]
 )
 
 with generate_tab:
@@ -494,38 +615,7 @@ with generate_tab:
         placeholder="Paste the full job description here...",
     )
 
-    try:
-        init_profile_db()
-        saved_profiles = get_all_profiles()
-    except Exception as exc:
-        saved_profiles = []
-        st.error(f"Could not load saved profiles: {exc}")
-
-    profile_mode = st.radio(
-        "Candidate profile source",
-        ["Use saved profile", "Paste profile manually"],
-        horizontal=True,
-        index=0 if saved_profiles else 1,
-    )
-
-    if profile_mode == "Use saved profile":
-        if saved_profiles:
-            profile_options = {
-                f"#{profile['id']} - {profile['profile_name']}": profile["id"]
-                for profile in saved_profiles
-            }
-            selected_profile_label = st.selectbox(
-                "Saved profile",
-                list(profile_options.keys()),
-            )
-            selected_profile_id = int(profile_options[selected_profile_label])
-
-            if st.button("Load Saved Profile"):
-                load_selected_profile_into_editor(selected_profile_id)
-        else:
-            st.info(
-                "No saved profiles yet. You can paste a profile manually or create one in Profile Memory."
-            )
+    render_profile_source_controls("candidate_profile_input", "Candidate")
 
     candidate_profile = st.text_area(
         "Candidate profile / CV",
@@ -549,6 +639,9 @@ with generate_tab:
         render_package(current_package)
         render_export_section(current_package)
         render_save_to_tracker(current_package)
+
+with ats_tab:
+    render_ats_scanner_tab()
 
 with tracker_tab:
     render_tracker_tab()
