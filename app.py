@@ -9,6 +9,7 @@ from export_utils import (
     application_package_to_text,
     create_safe_filename,
 )
+from job_url_importer import import_job_from_url
 from profile_store import (
     delete_profile,
     get_all_profiles,
@@ -213,6 +214,9 @@ def render_save_to_tracker(package: ApplicationPackage) -> None:
     """Render controls for saving the generated package to the local tracker."""
 
     st.header("Save to Job Tracker")
+    if st.session_state.get("source_job_url"):
+        st.caption(f"Source URL will be saved: {st.session_state['source_job_url']}")
+
     notes = st.text_area(
         "Tracker notes",
         key="tracker_save_notes",
@@ -221,7 +225,11 @@ def render_save_to_tracker(package: ApplicationPackage) -> None:
 
     if st.button("Save to Job Tracker"):
         try:
-            job_id = save_job(package, notes=notes)
+            job_id = save_job(
+                package,
+                notes=notes,
+                job_url=st.session_state.get("source_job_url"),
+            )
             st.success(f"Saved job #{job_id} to the local tracker.")
         except Exception as exc:
             st.error(f"Could not save job: {exc}")
@@ -341,6 +349,7 @@ def render_tracker_tab() -> None:
             "status",
             "date_added",
             "follow_up_date",
+            "job_url",
         ],
     )
 
@@ -369,6 +378,9 @@ def render_tracker_tab() -> None:
 
     st.write("**Recommended next action:**")
     st.write(selected_job.get("recommended_next_action") or "No recommendation saved.")
+    if selected_job.get("job_url"):
+        st.write("**Source URL:**")
+        st.write(selected_job["job_url"])
 
     update_col, delete_col = st.columns(2)
     with update_col:
@@ -823,6 +835,50 @@ def render_ats_scanner_tab() -> None:
         render_ats_scan_result(st.session_state["latest_ats_scan_result"])
 
 
+def render_job_url_import_section() -> None:
+    """Render single URL job description import controls."""
+
+    st.subheader("Job URL Import")
+    st.caption(
+        "Optional: paste one job posting URL. JobPilot will try to extract text, then you can review and edit it below."
+    )
+
+    job_url = st.text_input(
+        "Job posting URL",
+        key="job_url_input",
+        placeholder="https://example.com/jobs/software-developer",
+    )
+
+    if st.button("Import Job Description from URL"):
+        try:
+            with st.spinner("Importing job description from URL..."):
+                result = import_job_from_url(job_url)
+
+            if result.extraction_status == "failed":
+                st.session_state["source_job_url"] = result.source_url
+                for warning in result.warnings:
+                    st.warning(warning)
+                st.error(
+                    "Could not extract this job posting automatically. Please paste the job description manually."
+                )
+                return
+
+            st.session_state["job_description_input"] = result.extracted_text
+            st.session_state["source_job_url"] = result.source_url
+
+            if result.extraction_status == "success":
+                st.success("Imported job text. Please review and edit it before generating.")
+            else:
+                st.warning("Imported partial job text. Please review and edit it before generating.")
+
+            for warning in result.warnings:
+                st.warning(warning)
+        except JobPilotError as exc:
+            st.error(str(exc))
+        except Exception as exc:
+            st.error(f"Could not import this job posting automatically: {exc}")
+
+
 st.title("JobPilot Agent")
 st.write(
     "A local AI job-search assistant that helps turn a job description and candidate profile "
@@ -845,8 +901,11 @@ generate_tab, ats_tab, tracker_tab, profile_tab, normalizer_tab, localization_ta
 )
 
 with generate_tab:
+    render_job_url_import_section()
+
     job_description = st.text_area(
         "Job description",
+        key="job_description_input",
         height=260,
         placeholder="Paste the full job description here...",
     )

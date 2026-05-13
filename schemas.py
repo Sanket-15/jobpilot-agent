@@ -126,6 +126,15 @@ class LocalizedResume(BaseModel):
     localized_profile_text: str
 
 
+class JobUrlImportResult(BaseModel):
+    """Result from importing a single user-provided job posting URL."""
+
+    source_url: str
+    extracted_text: str
+    extraction_status: Literal["success", "partial", "failed"]
+    warnings: list[str]
+
+
 class ClaimsCheck(BaseModel):
     """Unsupported claim warnings."""
 

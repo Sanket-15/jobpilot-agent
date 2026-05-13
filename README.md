@@ -77,10 +77,24 @@ JobPilot must not invent experience, companies, dates, tools, certifications, me
 - No cloud storage.
 - No auto-apply.
 
+### V8 - Job URL Import
+
+- Paste a job posting URL.
+- JobPilot tries to extract job text.
+- Extracted text is shown for review/edit.
+- Manual paste fallback remains available.
+- Source URL can be saved to tracker.
+- Single user-provided URL only.
+- No crawling.
+- No job search yet.
+- No scraping at scale.
+- No login bypass.
+- No auto-apply.
+
 ## How It Works
 
 1. Paste or select a profile.
-2. Paste a job description.
+2. Paste a job description or import one from a single job URL.
 3. Generate an application package.
 4. Review claim warnings.
 5. Export the package or save the job to the tracker.
@@ -98,6 +112,8 @@ JobPilot demonstrates an agentic workflow with orchestration, structured outputs
 - Pydantic
 - SQLite
 - python-dotenv
+- requests
+- Beautiful Soup
 
 ## Folder Structure
 
@@ -115,6 +131,7 @@ jobpilot-agent/
 ├── ats_scanner.py
 ├── profile_normalizer.py
 ├── resume_localizer.py
+├── job_url_importer.py
 ├── requirements.txt
 ├── .env.example
 ├── .gitignore
@@ -164,6 +181,7 @@ streamlit run app.py
 - `data/jobs.db` stores local tracker and saved profile data.
 - `data/jobs.db` may contain personal data.
 - `data/jobs.db` is ignored by Git.
+- Saved tracker rows may include a user-provided source job URL.
 - `.env` is ignored by Git.
 - API keys should never be committed.
 - Localized profiles may contain personal data.
@@ -178,7 +196,7 @@ Do not use real phone numbers, private emails, birthdates, or full personal CV d
 
 ## Current Limitations
 
-- No job URL import yet.
+- Job URL import is single-URL only and may fail on blocked, login-only, or JavaScript-rendered pages.
 - No file upload yet.
 - No PDF/DOCX export yet.
 - No authentication.
@@ -188,11 +206,12 @@ Do not use real phone numbers, private emails, birthdates, or full personal CV d
 
 ## Roadmap
 
-- V8 Job URL Import with safe fallback
-- V9 Job Discovery using safe APIs
-- V10 Mock Interview Mode
+- CV file import: PDF / LaTeX
+- Job search and filtering
+- Job ranking
+- Mock interview mode
+- Controlled apply flow and application logging
 - Later DOCX/PDF export
-- Later controlled apply flow with explicit user approval
 
 ## Demo Data Warning
 
