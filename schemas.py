@@ -135,6 +135,16 @@ class JobUrlImportResult(BaseModel):
     warnings: list[str]
 
 
+class CVFileImportResult(BaseModel):
+    """Result from importing a local CV/profile file in memory."""
+
+    filename: str
+    file_type: Literal["pdf", "tex", "txt", "md", "unknown"]
+    extracted_text: str
+    extraction_status: Literal["success", "partial", "failed"]
+    warnings: list[str]
+
+
 class ClaimsCheck(BaseModel):
     """Unsupported claim warnings."""
 

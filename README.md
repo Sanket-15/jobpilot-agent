@@ -91,6 +91,19 @@ JobPilot must not invent experience, companies, dates, tools, certifications, me
 - No login bypass.
 - No auto-apply.
 
+### V9 - CV File Import
+
+- Upload PDF, LaTeX, TXT, or Markdown CV/profile files.
+- Extract readable text locally in memory.
+- Review/edit extracted text before normalization.
+- Send extracted text into Profile Normalizer.
+- Save cleaned profile to Profile Memory.
+- No OCR.
+- No DOCX yet.
+- No uploaded files are saved.
+- No cloud storage.
+- No auto-apply.
+
 ## How It Works
 
 1. Paste or select a profile.
@@ -114,6 +127,7 @@ JobPilot demonstrates an agentic workflow with orchestration, structured outputs
 - python-dotenv
 - requests
 - Beautiful Soup
+- pypdf
 
 ## Folder Structure
 
@@ -132,6 +146,7 @@ jobpilot-agent/
 ├── profile_normalizer.py
 ├── resume_localizer.py
 ├── job_url_importer.py
+├── cv_file_importer.py
 ├── requirements.txt
 ├── .env.example
 ├── .gitignore
@@ -186,6 +201,9 @@ streamlit run app.py
 - API keys should never be committed.
 - Localized profiles may contain personal data.
 - Localized profiles are saved locally in `data/jobs.db` only when the user clicks Save Localized Profile to Profile Memory.
+- Uploaded CVs may contain personal data.
+- JobPilot extracts uploaded CV text in memory and does not save uploaded files.
+- Only profiles explicitly saved by the user are stored locally in `data/jobs.db`.
 - Generated content must be reviewed by the user.
 - Only add keywords or claims if they reflect real experience.
 - No auto-apply.
@@ -197,7 +215,7 @@ Do not use real phone numbers, private emails, birthdates, or full personal CV d
 ## Current Limitations
 
 - Job URL import is single-URL only and may fail on blocked, login-only, or JavaScript-rendered pages.
-- No file upload yet.
+- CV file import does not support OCR or DOCX yet.
 - No PDF/DOCX export yet.
 - No authentication.
 - No deployment.
@@ -206,12 +224,10 @@ Do not use real phone numbers, private emails, birthdates, or full personal CV d
 
 ## Roadmap
 
-- CV file import: PDF / LaTeX
 - Job search and filtering
 - Job ranking
-- Mock interview mode
 - Controlled apply flow and application logging
-- Later DOCX/PDF export
+- Optional DOCX/PDF export improvements
 
 ## Demo Data Warning
 
