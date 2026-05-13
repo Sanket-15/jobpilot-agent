@@ -4,6 +4,7 @@ import streamlit as st
 
 from agent import generate_application_package
 from ats_scanner import run_ats_scan
+from cv_file_importer import import_cv_file
 from export_utils import (
     application_package_to_markdown,
     application_package_to_text,
@@ -566,6 +567,39 @@ def render_profile_normalizer_tab() -> None:
     st.header("Profile Normalizer")
     st.write("Paste messy CV, profile, or LinkedIn-style text and convert it into a clean reusable profile.")
     st.warning("Review and edit the normalized profile before saving it to Profile Memory.")
+
+    st.subheader("CV File Import")
+    st.warning("Uploaded CV files are processed locally in memory. Review extracted text before normalization or saving.")
+    uploaded_cv = st.file_uploader(
+        "Upload CV/profile file",
+        type=["pdf", "tex", "txt", "md"],
+        key="cv_file_import_upload",
+    )
+
+    if st.button("Import CV File"):
+        if uploaded_cv is None:
+            st.warning("Please select a CV/profile file before importing.")
+        else:
+            try:
+                result = import_cv_file(uploaded_cv.name, uploaded_cv.getvalue())
+                st.session_state["cv_import_extracted_text"] = result.extracted_text
+                st.session_state["cv_import_warnings"] = result.warnings
+
+                if result.extraction_status == "failed":
+                    st.error("Could not extract enough readable CV text. Please paste the text manually.")
+                else:
+                    st.session_state["normalizer_raw_profile_text"] = result.extracted_text
+                    if result.extraction_status == "success":
+                        st.success("Imported CV text. Please review and edit it before normalization.")
+                    else:
+                        st.warning("Imported partial CV text. Please review and edit it before normalization.")
+            except JobPilotError as exc:
+                st.error(str(exc))
+            except Exception as exc:
+                st.error(f"Could not import this CV file: {exc}")
+
+    for warning in st.session_state.get("cv_import_warnings", []):
+        st.warning(warning)
 
     raw_profile_text = st.text_area(
         "Raw profile / CV / LinkedIn-style text",
