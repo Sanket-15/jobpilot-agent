@@ -70,6 +70,24 @@ class ATSAnalysis(BaseModel):
     formatting_risks: list[str]
 
 
+class ATSScanResult(BaseModel):
+    """Dedicated ATS resume scanner result."""
+
+    ats_score: int = Field(ge=0, le=100)
+    match_confidence: Literal["high", "medium", "low"]
+    supported_keywords: list[str]
+    missing_keywords: list[str]
+    needs_clarification_keywords: list[str]
+    keyword_improvement_suggestions: list[str]
+    weak_bullet_point_suggestions: list[str]
+    formatting_risks: list[str]
+    overused_phrases: list[str]
+    suggested_skills_ordering: list[str]
+    top_cv_improvements: list[str]
+    unsupported_or_risky_claims: list[str]
+    recommended_next_action: str
+
+
 class ClaimsCheck(BaseModel):
     """Unsupported claim warnings."""
 

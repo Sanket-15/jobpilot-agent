@@ -43,6 +43,24 @@ JobPilot Agent is a local AI job-search assistant that helps turn a job descript
 - No auto-save of exports.
 - No auto-apply.
 
+## What V5 Adds
+
+- ATS Resume Scanner.
+- Paste a job description and CV/profile.
+- Get an ATS score.
+- Identify supported keywords.
+- Identify missing keywords.
+- Identify needs-clarification keywords.
+- Get bullet improvement suggestions.
+- Get formatting risks.
+- Get a safe next action.
+- Paste-based only.
+- No upload yet.
+- No job URL import yet.
+- No scraping.
+- No auto-apply.
+- No cloud storage.
+
 ## What V1 Does Not Do
 
 - It does not auto-apply to jobs.
@@ -135,6 +153,7 @@ Jordan Lee is a junior data analyst with experience using SQL, Excel, and Tablea
 - Add CV upload/import in a later version.
 - Add an application tracker in a later version.
 - Add DOCX/PDF export in a later version. V4 only supports `.md` and `.txt`.
+- Add file upload in a later version. V5 remains paste-based only.
 - Add configurable Gemini model settings.
 - Improve claim checking with stronger evidence mapping.
 - Add optional resume section-by-section tailoring.
