@@ -61,6 +61,19 @@ JobPilot Agent is a local AI job-search assistant that helps turn a job descript
 - No auto-apply.
 - No cloud storage.
 
+## What V6 Adds
+
+- Profile Import / Profile Normalizer.
+- Paste raw CV, profile, or LinkedIn-style text.
+- Normalize messy text into a clean reusable candidate profile.
+- Review and edit the normalized profile before saving.
+- Save normalized profiles to Profile Memory.
+- Supports English, German, and mixed text.
+- No scraping.
+- No file upload yet.
+- No cloud storage.
+- No auto-apply.
+
 ## What V1 Does Not Do
 
 - It does not auto-apply to jobs.
@@ -83,6 +96,8 @@ For portfolio screenshots, use fake demo data only. Do not include real phone nu
 The app stores job tracker metadata and saved candidate profiles locally in `data/jobs.db`. The database is ignored by Git and should not be committed. Saved profiles may contain personal data, so keep `data/jobs.db` private. The app does not store API keys in the database.
 
 Exported Markdown and plain text files may contain personal application content. Exports are created only when you click the download buttons; the app does not auto-save export files locally or store them in the database.
+
+Normalized profiles may contain personal data. They are saved locally in `data/jobs.db` only when you click **Save to Profile Memory**. Keep `data/jobs.db` private and do not commit it.
 
 ## Setup
 
@@ -149,11 +164,13 @@ Jordan Lee is a junior data analyst with experience using SQL, Excel, and Tablea
 ## Future Roadmap
 
 - Add editable review screens before final copy.
-- Add job URL import in a later version.
-- Add CV upload/import in a later version.
+- Add file upload and CV import in a later version.
 - Add an application tracker in a later version.
 - Add DOCX/PDF export in a later version. V4 only supports `.md` and `.txt`.
-- Add file upload in a later version. V5 remains paste-based only.
+- Add PDF/DOCX parsing in a later version.
+- Add localization/translation options in a later version.
+- Add job URL import in a later version.
+- V6 remains paste-based only.
 - Add configurable Gemini model settings.
 - Improve claim checking with stronger evidence mapping.
 - Add optional resume section-by-section tailoring.

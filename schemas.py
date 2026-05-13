@@ -88,6 +88,26 @@ class ATSScanResult(BaseModel):
     recommended_next_action: str
 
 
+class NormalizedProfile(BaseModel):
+    """Clean reusable candidate profile produced by the profile normalizer."""
+
+    candidate_name: str | None = None
+    suggested_profile_name: str
+    target_roles: list[str]
+    preferred_locations: list[str]
+    professional_summary: str
+    skills: list[str]
+    tools_and_technologies: list[str]
+    experience_summary: list[str]
+    education: list[str]
+    certifications: list[str]
+    projects: list[str]
+    languages: list[str]
+    missing_or_unclear_information: list[str]
+    warnings: list[str]
+    normalized_profile_text: str
+
+
 class ClaimsCheck(BaseModel):
     """Unsupported claim warnings."""
 
