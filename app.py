@@ -3,6 +3,11 @@
 import streamlit as st
 
 from agent import generate_application_package
+from export_utils import (
+    application_package_to_markdown,
+    application_package_to_text,
+    create_safe_filename,
+)
 from profile_store import (
     delete_profile,
     get_all_profiles,
@@ -211,6 +216,36 @@ def render_save_to_tracker(package: ApplicationPackage) -> None:
             st.success(f"Saved job #{job_id} to the local tracker.")
         except Exception as exc:
             st.error(f"Could not save job: {exc}")
+
+
+def render_export_section(package: ApplicationPackage) -> None:
+    """Render in-memory export download buttons."""
+
+    st.header("Export")
+    st.caption("Exports are generated in memory only and are not saved automatically.")
+
+    job = package.job_info
+    markdown_content = application_package_to_markdown(package)
+    text_content = application_package_to_text(package)
+
+    markdown_filename = create_safe_filename(job.company_name, job.role_title, "md")
+    text_filename = create_safe_filename(job.company_name, job.role_title, "txt")
+
+    download_col_1, download_col_2 = st.columns(2)
+    with download_col_1:
+        st.download_button(
+            "Download Markdown",
+            data=markdown_content,
+            file_name=markdown_filename,
+            mime="text/markdown",
+        )
+    with download_col_2:
+        st.download_button(
+            "Download Text",
+            data=text_content,
+            file_name=text_filename,
+            mime="text/plain",
+        )
 
 
 def render_tracker_tab() -> None:
@@ -512,6 +547,7 @@ with generate_tab:
     if "last_application_package" in st.session_state:
         current_package = st.session_state["last_application_package"]
         render_package(current_package)
+        render_export_section(current_package)
         render_save_to_tracker(current_package)
 
 with tracker_tab:

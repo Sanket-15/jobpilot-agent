@@ -34,6 +34,15 @@ JobPilot Agent is a local AI job-search assistant that helps turn a job descript
 - No login.
 - No auto-apply.
 
+## What V4 Adds
+
+- Export a generated application package as Markdown.
+- Export a generated application package as plain text.
+- Export manually using download buttons.
+- No PDF or DOCX export yet.
+- No auto-save of exports.
+- No auto-apply.
+
 ## What V1 Does Not Do
 
 - It does not auto-apply to jobs.
@@ -54,6 +63,8 @@ The claim checker is intentionally cautious. It may flag content that is actuall
 For portfolio screenshots, use fake demo data only. Do not include real phone numbers, private emails, birthdates, or full personal CV data in GitHub screenshots.
 
 The app stores job tracker metadata and saved candidate profiles locally in `data/jobs.db`. The database is ignored by Git and should not be committed. Saved profiles may contain personal data, so keep `data/jobs.db` private. The app does not store API keys in the database.
+
+Exported Markdown and plain text files may contain personal application content. Exports are created only when you click the download buttons; the app does not auto-save export files locally or store them in the database.
 
 ## Setup
 
@@ -123,7 +134,7 @@ Jordan Lee is a junior data analyst with experience using SQL, Excel, and Tablea
 - Add job URL import in a later version.
 - Add CV upload/import in a later version.
 - Add an application tracker in a later version.
-- Add DOCX/PDF export in a later version.
+- Add DOCX/PDF export in a later version. V4 only supports `.md` and `.txt`.
 - Add configurable Gemini model settings.
 - Improve claim checking with stronger evidence mapping.
 - Add optional resume section-by-section tailoring.
