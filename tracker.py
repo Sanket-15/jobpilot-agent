@@ -45,9 +45,25 @@ def init_db() -> None:
             )
             """
         )
+        _ensure_job_url_column(connection)
 
 
-def save_job(application_package: ApplicationPackage, notes: str = "") -> int:
+def _ensure_job_url_column(connection: sqlite3.Connection) -> None:
+    """Add the optional job_url column for existing V2 tracker databases."""
+
+    columns = {
+        row[1]
+        for row in connection.execute("PRAGMA table_info(jobs)").fetchall()
+    }
+    if "job_url" not in columns:
+        connection.execute("ALTER TABLE jobs ADD COLUMN job_url TEXT")
+
+
+def save_job(
+    application_package: ApplicationPackage,
+    notes: str = "",
+    job_url: str | None = None,
+) -> int:
     """Save tracker-level metadata from an application package."""
 
     init_db()
@@ -66,9 +82,10 @@ def save_job(application_package: ApplicationPackage, notes: str = "") -> int:
                 match_confidence,
                 status,
                 recommended_next_action,
-                notes
+                notes,
+                job_url
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 job.company_name,
@@ -80,6 +97,7 @@ def save_job(application_package: ApplicationPackage, notes: str = "") -> int:
                 "Interested",
                 application_package.recommended_next_action,
                 notes,
+                job_url,
             ),
         )
         return int(cursor.lastrowid)
@@ -106,7 +124,8 @@ def get_all_jobs() -> list[dict[str, Any]]:
                 date_applied,
                 follow_up_date,
                 recommended_next_action,
-                notes
+                notes,
+                job_url
             FROM jobs
             ORDER BY date_added DESC, id DESC
             """
