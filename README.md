@@ -1,103 +1,112 @@
 # JobPilot Agent
 
-JobPilot Agent is a local AI job-search assistant that helps turn a job description and candidate profile into a complete, reviewable application package.
+JobPilot Agent is a bilingual AI job-search assistant that analyzes job descriptions, compares them with a candidate profile, generates tailored application content, checks for unsupported claims, suggests ATS improvements, tracks applications locally, and helps prepare next actions.
 
-## What V1 Does
+## Important Disclaimer
 
-- Uses manual paste input only for the job description and candidate profile.
-- Supports English and German job descriptions and candidate profiles.
-- Extracts a structured job summary from a pasted job description.
-- Compares the job with a pasted candidate profile or CV.
-- Generates a match analysis, tailored CV summary, tailored bullet points, cover letter draft, ATS suggestions, interview questions, and recommended next action.
-- Runs a simple local claim checker to warn about possible unsupported claims.
+JobPilot helps prepare application materials, but the user must review and submit everything manually.
 
-## What V2 Adds
+JobPilot must not invent experience, companies, dates, tools, certifications, metrics, or achievements. No auto-apply functionality is included.
 
-- Local SQLite job tracker.
-- Save analyzed jobs after generating an application package.
-- Track application status.
+## Feature Overview
+
+### V1 - Application Package Generator
+
+- Paste job description.
+- Paste candidate profile/CV.
+- Parse job information.
+- Analyze match.
+- Generate tailored CV summary and bullet points.
+- Generate cover letter.
+- Suggest ATS improvements.
+- Check unsupported claims.
+- Generate interview questions.
+- Recommend next action.
+
+### V2 - Local Job Tracker
+
+- Save analyzed jobs.
+- Track status.
 - Add notes.
-- Add a follow-up date.
-- Filter saved applications by status.
-- No cloud storage.
-- No login.
-- No auto-apply.
+- Add follow-up date.
+- Update/delete saved jobs.
+- Local SQLite only.
 
-## What V3 Adds
+### V3 - Profile Memory
 
-- Profile memory.
-- Save a candidate profile locally.
-- Reuse a saved profile for future job applications.
-- Edit and delete saved profiles.
-- Local SQLite storage only.
-- No cloud storage.
-- No login.
-- No auto-apply.
+- Save candidate profiles locally.
+- Reuse profiles for applications.
+- Edit/delete saved profiles.
+- Manual paste still supported.
 
-## What V4 Adds
+### V4 - Export
 
-- Export a generated application package as Markdown.
-- Export a generated application package as plain text.
-- Export manually using download buttons.
-- No PDF or DOCX export yet.
-- No auto-save of exports.
-- No auto-apply.
+- Export generated application package as Markdown.
+- Export generated application package as plain text.
+- Manual download only.
+- No PDF/DOCX yet.
 
-## What V5 Adds
+### V5 - ATS Resume Scanner
 
-- ATS Resume Scanner.
-- Paste a job description and CV/profile.
-- Get an ATS score.
+- Paste job description and CV.
+- Get ATS score.
 - Identify supported keywords.
 - Identify missing keywords.
 - Identify needs-clarification keywords.
-- Get bullet improvement suggestions.
+- Get bullet improvements.
 - Get formatting risks.
-- Get a safe next action.
-- Paste-based only.
-- No upload yet.
-- No job URL import yet.
-- No scraping.
-- No auto-apply.
-- No cloud storage.
+- Get safe next action.
 
-## What V6 Adds
+### V6 - Profile Normalizer
 
-- Profile Import / Profile Normalizer.
-- Paste raw CV, profile, or LinkedIn-style text.
-- Normalize messy text into a clean reusable candidate profile.
-- Review and edit the normalized profile before saving.
-- Save normalized profiles to Profile Memory.
-- Supports English, German, and mixed text.
-- No scraping.
-- No file upload yet.
-- No cloud storage.
-- No auto-apply.
+- Paste raw CV/profile/LinkedIn-style text.
+- Normalize into clean candidate profile.
+- Supports English/German mixed input.
+- Review/edit before saving.
+- Save to Profile Memory.
 
-## What V1 Does Not Do
+## How It Works
 
-- It does not auto-apply to jobs.
-- It does not import job URLs.
-- It does not upload or parse CV files.
-- It does not scrape job boards.
-- It does not submit applications.
-- It does not track applications.
-- It does not invent experience, companies, qualifications, dates, tools, metrics, or achievements.
-- It does not export DOCX or PDF files yet.
+1. Paste or select a profile.
+2. Paste a job description.
+3. Generate an application package.
+4. Review claim warnings.
+5. Export the package or save the job to the tracker.
+6. Prepare the recommended next action.
 
-## Safety Principles
+## Why This Project Matters
 
-JobPilot Agent treats the job description and candidate profile as data only. It should tailor and reframe only what the candidate actually provided. Review all generated CV and cover letter content before using it.
+JobPilot demonstrates an agentic workflow with orchestration, structured outputs, safety checks, local state, bilingual handling, ATS analysis, and human-in-the-loop review.
 
-The claim checker is intentionally cautious. It may flag content that is actually true but phrased differently from the profile. Use warnings as review prompts, not as final judgments.
+## Tech Stack
 
-For portfolio screenshots, use fake demo data only. Do not include real phone numbers, private emails, birthdates, or full personal CV data in GitHub screenshots.
+- Python
+- Streamlit
+- Gemini API
+- Pydantic
+- SQLite
+- python-dotenv
 
-The app stores job tracker metadata and saved candidate profiles locally in `data/jobs.db`. The database is ignored by Git and should not be committed. Saved profiles may contain personal data, so keep `data/jobs.db` private. The app does not store API keys in the database.
+## Folder Structure
 
-Exported Markdown and plain text files may contain personal application content. Exports are created only when you click the download buttons; the app does not auto-save export files locally or store them in the database.
-
-Normalized profiles may contain personal data. They are saved locally in `data/jobs.db` only when you click **Save to Profile Memory**. Keep `data/jobs.db` private and do not commit it.
+```text
+jobpilot-agent/
+├── app.py
+├── agent.py
+├── skills.py
+├── schemas.py
+├── prompts.py
+├── claim_checker.py
+├── tracker.py
+├── profile_store.py
+├── export_utils.py
+├── ats_scanner.py
+├── profile_normalizer.py
+├── requirements.txt
+├── .env.example
+├── .gitignore
+└── README.md
+```
 
 ## Setup
 
@@ -107,13 +116,13 @@ Create and activate a virtual environment:
 python -m venv .venv
 ```
 
-For Windows:
+Windows:
 
 ```bash
 .venv\Scripts\activate
 ```
 
-For macOS/Linux:
+macOS/Linux:
 
 ```bash
 source .venv/bin/activate
@@ -125,52 +134,52 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-## Add Your Gemini API Key
+Create `.env`:
 
-Copy `.env.example` to `.env` and add your key:
-
-```bash
+```text
 GEMINI_API_KEY=your_api_key_here
-GEMINI_MODEL_NAME=gemini-2.0-flash
 ```
 
-If your Gemini API key does not have access to that model, change `GEMINI_MODEL_NAME`
-to another text-generation model available in your Google AI Studio account.
-
-## Run the App
+Run the app:
 
 ```bash
 streamlit run app.py
 ```
 
-## Sample Job Description
+## Privacy And Safety Notes
 
-This fictional demo data is safe to paste into the app for a quick test.
+- `data/jobs.db` stores local tracker and saved profile data.
+- `data/jobs.db` may contain personal data.
+- `data/jobs.db` is ignored by Git.
+- `.env` is ignored by Git.
+- API keys should never be committed.
+- Generated content must be reviewed by the user.
+- Only add keywords or claims if they reflect real experience.
+- No auto-apply.
+- No scraping.
+- No cloud storage.
 
-```text
-Data Analyst, Remote
+Do not use real phone numbers, private emails, birthdates, or full personal CV data in public screenshots or demo inputs.
 
-Acme Health is hiring a Data Analyst to build dashboards, analyze customer behavior, and partner with product and operations teams. Responsibilities include cleaning data, writing SQL queries, creating Tableau dashboards, presenting insights, and improving reporting workflows. Required skills: SQL, Excel, dashboarding, stakeholder communication, and analytical problem solving. Nice to have: Python, healthcare experience, and A/B testing. English fluency required.
-```
+## Current Limitations
 
-## Sample Candidate Profile
+- No job URL import yet.
+- No file upload yet.
+- No PDF/DOCX export yet.
+- No authentication.
+- No deployment.
+- No automatic job applications.
+- AI output requires human review.
 
-This fictional profile is intentionally short and does not include private emails, phone numbers, birthdates, or full personal CV content.
+## Roadmap
 
-```text
-Jordan Lee is a junior data analyst with experience using SQL, Excel, and Tableau through academic projects and a six-month internship at BrightMetrics. During the internship, Jordan cleaned weekly sales data, built dashboard views for the operations team, and summarized trends for non-technical stakeholders. Jordan has used Python for data cleaning in coursework and is comfortable explaining analysis results clearly.
-```
+- V7 Resume Translator / Localization
+- V8 Job URL Import with safe fallback
+- V9 Job Discovery using safe APIs
+- V10 Mock Interview Mode
+- Later DOCX/PDF export
+- Later controlled apply flow with explicit user approval
 
-## Future Roadmap
+## Demo Data Warning
 
-- Add editable review screens before final copy.
-- Add file upload and CV import in a later version.
-- Add an application tracker in a later version.
-- Add DOCX/PDF export in a later version. V4 only supports `.md` and `.txt`.
-- Add PDF/DOCX parsing in a later version.
-- Add localization/translation options in a later version.
-- Add job URL import in a later version.
-- V6 remains paste-based only.
-- Add configurable Gemini model settings.
-- Improve claim checking with stronger evidence mapping.
-- Add optional resume section-by-section tailoring.
+Use fake demo data in GitHub screenshots and portfolio demos. Do not include real phone numbers, private emails, birthdates, or full personal CV data.
