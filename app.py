@@ -18,7 +18,14 @@ from profile_store import (
     update_profile,
 )
 from profile_normalizer import normalize_profile, normalized_profile_to_text
-from schemas import ATSScanResult, ApplicationPackage, NormalizedProfile, SkillEvidence
+from resume_localizer import localize_resume_profile, localized_resume_to_text
+from schemas import (
+    ATSScanResult,
+    ApplicationPackage,
+    LocalizedResume,
+    NormalizedProfile,
+    SkillEvidence,
+)
 from skills import JobPilotError
 from tracker import (
     ALLOWED_STATUSES,
@@ -601,6 +608,133 @@ def render_profile_normalizer_tab() -> None:
             st.error(f"Could not save normalized profile: {exc}")
 
 
+def render_localized_resume_result(result: LocalizedResume) -> None:
+    """Render structured localized resume/profile output."""
+
+    st.header("Localized Resume/Profile")
+
+    st.write(f"**Detected source language:** {result.detected_source_language or 'Unknown'}")
+    st.write(f"**Target language:** {result.target_language or 'Not provided'}")
+    st.write(f"**Target market:** {result.target_market or 'Not provided'}")
+    st.write(f"**Tone:** {result.tone or 'Not provided'}")
+
+    st.subheader("Localized professional summary")
+    st.write(result.localized_professional_summary or "No summary provided.")
+
+    st.subheader("Localized skills")
+    render_list(result.localized_skills)
+
+    st.subheader("Localized experience bullets")
+    render_list(result.localized_experience_bullets)
+
+    st.subheader("Localized education")
+    render_list(result.localized_education)
+
+    st.subheader("Localized certifications")
+    render_list(result.localized_certifications)
+
+    st.subheader("Localized projects")
+    render_list(result.localized_projects)
+
+    st.subheader("Localization notes")
+    render_list(result.localization_notes)
+
+    st.subheader("Unsupported / unclear claim warnings")
+    render_warning_list(result.unsupported_or_unclear_claim_warnings)
+
+
+def render_resume_localization_tab() -> None:
+    """Render paste-based resume/profile localization."""
+
+    st.header("Resume Localization")
+    st.write("Paste an English, German, or mixed CV/profile and localize it for a target market.")
+    st.warning("Review and edit localized content before saving it to Profile Memory.")
+
+    profile_text = st.text_area(
+        "CV/profile text",
+        height=300,
+        key="localizer_profile_text",
+        placeholder="Paste CV or profile text here...",
+    )
+
+    col_1, col_2 = st.columns(2)
+    with col_1:
+        source_language = st.selectbox(
+            "Source language",
+            ["Auto-detect", "English", "German"],
+            key="localizer_source_language",
+        )
+        target_market = st.selectbox(
+            "Target market",
+            ["Germany", "International / English-speaking"],
+            key="localizer_target_market",
+        )
+    with col_2:
+        target_language = st.selectbox(
+            "Target language",
+            ["English", "German"],
+            key="localizer_target_language",
+        )
+        tone = st.selectbox(
+            "Tone",
+            ["Professional", "Concise", "Modern"],
+            key="localizer_tone",
+        )
+
+    optional_profile_name = st.text_input(
+        "Optional profile name",
+        key="localizer_profile_name",
+        placeholder="Leave blank to use a safe default",
+    )
+
+    if st.button("Localize Resume/Profile", type="primary"):
+        try:
+            with st.spinner("Localizing resume/profile..."):
+                localized = localize_resume_profile(
+                    profile_text=profile_text,
+                    source_language=source_language,
+                    target_language=target_language,
+                    target_market=target_market,
+                    tone=tone,
+                )
+            st.session_state["latest_localized_resume"] = localized
+            st.session_state["localized_resume_edit_text"] = localized_resume_to_text(localized)
+        except JobPilotError as exc:
+            st.error(str(exc))
+        except Exception as exc:
+            st.error(f"Something unexpected went wrong during resume localization: {exc}")
+
+    if "latest_localized_resume" not in st.session_state:
+        return
+
+    localized_resume = st.session_state["latest_localized_resume"]
+    render_localized_resume_result(localized_resume)
+
+    st.subheader("Review and edit localized profile text")
+    edited_localized_text = st.text_area(
+        "Editable localized profile text",
+        key="localized_resume_edit_text",
+        height=360,
+    )
+
+    if st.button("Save Localized Profile to Profile Memory"):
+        default_name = f"Localized Profile - {localized_resume.target_language or target_language}"
+        profile_name = (optional_profile_name or default_name).strip()
+        try:
+            profile_id = save_profile(
+                profile_name=profile_name,
+                candidate_name="",
+                target_roles="",
+                preferred_locations="",
+                profile_text=edited_localized_text,
+            )
+            st.success(f"Saved localized profile #{profile_id} to Profile Memory.")
+        except ValueError as exc:
+            st.warning(str(exc))
+        except Exception as exc:
+            st.error(f"Could not save localized profile: {exc}")
+
+
 def load_selected_profile_into_editor(profile_id: int, target_key: str = "candidate_profile_input") -> None:
     """Load a saved profile into the editable generation text area."""
 
@@ -699,13 +833,14 @@ st.warning(
     "experience, qualifications, companies, dates, tools, metrics, or achievements."
 )
 
-generate_tab, ats_tab, tracker_tab, profile_tab, normalizer_tab = st.tabs(
+generate_tab, ats_tab, tracker_tab, profile_tab, normalizer_tab, localization_tab = st.tabs(
     [
         "Generate Application Package",
         "ATS Scanner",
         "Job Tracker",
         "Profile Memory",
         "Profile Normalizer",
+        "Resume Localization",
     ]
 )
 
@@ -752,3 +887,6 @@ with profile_tab:
 
 with normalizer_tab:
     render_profile_normalizer_tab()
+
+with localization_tab:
+    render_resume_localization_tab()
