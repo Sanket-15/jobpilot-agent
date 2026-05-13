@@ -17,7 +17,8 @@ from profile_store import (
     save_profile,
     update_profile,
 )
-from schemas import ATSScanResult, ApplicationPackage, SkillEvidence
+from profile_normalizer import normalize_profile, normalized_profile_to_text
+from schemas import ATSScanResult, ApplicationPackage, NormalizedProfile, SkillEvidence
 from skills import JobPilotError
 from tracker import (
     ALLOWED_STATUSES,
@@ -506,6 +507,100 @@ def render_profile_memory_tab() -> None:
             st.error(f"Could not delete profile: {exc}")
 
 
+def render_normalized_profile_result(result: NormalizedProfile) -> None:
+    """Render structured normalized profile output."""
+
+    st.header("Normalized Profile")
+
+    st.write(f"**Detected candidate name:** {result.candidate_name or 'Not provided'}")
+    st.write(f"**Suggested profile name:** {result.suggested_profile_name or 'Not provided'}")
+
+    st.subheader("Target roles")
+    render_list(result.target_roles)
+    st.subheader("Preferred locations")
+    render_list(result.preferred_locations)
+    st.subheader("Professional summary")
+    st.write(result.professional_summary or "No summary provided.")
+    st.subheader("Extracted skills")
+    render_list(result.skills)
+    st.subheader("Tools and technologies")
+    render_list(result.tools_and_technologies)
+    st.subheader("Experience summary")
+    render_list(result.experience_summary)
+    st.subheader("Education")
+    render_list(result.education)
+    st.subheader("Certifications")
+    render_list(result.certifications)
+    st.subheader("Projects")
+    render_list(result.projects)
+    st.subheader("Languages")
+    render_list(result.languages)
+    st.subheader("Missing or unclear information")
+    render_list(result.missing_or_unclear_information)
+    st.subheader("Warnings")
+    render_warning_list(result.warnings)
+
+
+def render_profile_normalizer_tab() -> None:
+    """Render paste-based profile import and normalization."""
+
+    st.header("Profile Normalizer")
+    st.write("Paste messy CV, profile, or LinkedIn-style text and convert it into a clean reusable profile.")
+    st.warning("Review and edit the normalized profile before saving it to Profile Memory.")
+
+    raw_profile_text = st.text_area(
+        "Raw profile / CV / LinkedIn-style text",
+        height=300,
+        key="normalizer_raw_profile_text",
+        placeholder="Paste raw profile, CV, or LinkedIn-style text here...",
+    )
+    optional_profile_name = st.text_input(
+        "Optional profile name",
+        key="normalizer_profile_name",
+        placeholder="Leave blank to use the suggested profile name",
+    )
+
+    if st.button("Normalize Profile", type="primary"):
+        try:
+            with st.spinner("Normalizing profile..."):
+                normalized = normalize_profile(raw_profile_text)
+            st.session_state["latest_normalized_profile"] = normalized
+            st.session_state["normalized_profile_edit_text"] = normalized_profile_to_text(normalized)
+        except JobPilotError as exc:
+            st.error(str(exc))
+        except Exception as exc:
+            st.error(f"Something unexpected went wrong during profile normalization: {exc}")
+
+    if "latest_normalized_profile" not in st.session_state:
+        return
+
+    normalized_profile = st.session_state["latest_normalized_profile"]
+    render_normalized_profile_result(normalized_profile)
+
+    st.subheader("Review and edit normalized profile text")
+    edited_profile_text = st.text_area(
+        "Editable normalized profile text",
+        key="normalized_profile_edit_text",
+        height=360,
+    )
+
+    if st.button("Save to Profile Memory"):
+        profile_name = (optional_profile_name or normalized_profile.suggested_profile_name or "").strip()
+        try:
+            profile_id = save_profile(
+                profile_name=profile_name,
+                candidate_name=normalized_profile.candidate_name or "",
+                target_roles=", ".join(normalized_profile.target_roles),
+                preferred_locations=", ".join(normalized_profile.preferred_locations),
+                profile_text=edited_profile_text,
+            )
+            st.success(f"Saved normalized profile #{profile_id} to Profile Memory.")
+        except ValueError as exc:
+            st.warning(str(exc))
+        except Exception as exc:
+            st.error(f"Could not save normalized profile: {exc}")
+
+
 def load_selected_profile_into_editor(profile_id: int, target_key: str = "candidate_profile_input") -> None:
     """Load a saved profile into the editable generation text area."""
 
@@ -604,8 +699,14 @@ st.warning(
     "experience, qualifications, companies, dates, tools, metrics, or achievements."
 )
 
-generate_tab, ats_tab, tracker_tab, profile_tab = st.tabs(
-    ["Generate Application Package", "ATS Scanner", "Job Tracker", "Profile Memory"]
+generate_tab, ats_tab, tracker_tab, profile_tab, normalizer_tab = st.tabs(
+    [
+        "Generate Application Package",
+        "ATS Scanner",
+        "Job Tracker",
+        "Profile Memory",
+        "Profile Normalizer",
+    ]
 )
 
 with generate_tab:
@@ -648,3 +749,6 @@ with tracker_tab:
 
 with profile_tab:
     render_profile_memory_tab()
+
+with normalizer_tab:
+    render_profile_normalizer_tab()
