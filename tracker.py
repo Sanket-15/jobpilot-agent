@@ -103,6 +103,54 @@ def save_job(
         return int(cursor.lastrowid)
 
 
+def save_searched_job(
+    title: str,
+    company: str,
+    location: str | None = None,
+    work_mode: str | None = None,
+    job_url: str | None = None,
+    notes: str = "",
+    status: str = "Interested",
+) -> int:
+    """Save tracker metadata for a searched job without generating a package."""
+
+    if status not in ALLOWED_STATUSES:
+        raise ValueError(f"Unsupported status: {status}")
+
+    init_db()
+    with sqlite3.connect(DB_PATH) as connection:
+        cursor = connection.execute(
+            """
+            INSERT INTO jobs (
+                company_name,
+                role_title,
+                location,
+                work_mode,
+                match_score,
+                match_confidence,
+                status,
+                recommended_next_action,
+                notes,
+                job_url
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                company,
+                title,
+                location,
+                work_mode,
+                0,
+                "not_scored",
+                status,
+                "Review the job details, then generate an application package if it looks relevant.",
+                notes,
+                job_url,
+            ),
+        )
+        return int(cursor.lastrowid)
+
+
 def get_all_jobs() -> list[dict[str, Any]]:
     """Return all saved tracker jobs as dictionaries."""
 
