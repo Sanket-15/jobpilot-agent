@@ -11,6 +11,7 @@ from export_utils import (
     create_safe_filename,
 )
 from job_url_importer import import_job_from_url
+from job_search import adzuna_credentials_configured, search_jobs
 from profile_store import (
     delete_profile,
     get_all_profiles,
@@ -24,6 +25,7 @@ from resume_localizer import localize_resume_profile, localized_resume_to_text
 from schemas import (
     ATSScanResult,
     ApplicationPackage,
+    JobSearchResult,
     LocalizedResume,
     NormalizedProfile,
     SkillEvidence,
@@ -35,6 +37,7 @@ from tracker import (
     get_all_jobs,
     init_db,
     save_job,
+    save_searched_job,
     update_follow_up_date,
     update_job_notes,
     update_job_status,
@@ -403,6 +406,147 @@ def render_tracker_tab() -> None:
                 st.rerun()
             except Exception as exc:
                 st.error(f"Could not delete job: {exc}")
+
+
+def _job_result_label(index: int, job: JobSearchResult) -> str:
+    """Return a compact label for selecting a searched job."""
+
+    return f"{index + 1}. {job.title} - {job.company} ({job.source})"
+
+
+def render_job_search_tab() -> None:
+    """Render safe API/feed job search and filtering."""
+
+    st.header("Job Search")
+    st.write("Search safe job API/feed providers, review results, and save selected jobs to the local tracker.")
+    st.warning("Search does not generate application packages, rank jobs with AI, or apply automatically.")
+
+    if not adzuna_credentials_configured():
+        st.info("Adzuna credentials are not configured. Using free providers only.")
+
+    col_1, col_2 = st.columns(2)
+    with col_1:
+        query = st.text_input(
+            "Keyword / query",
+            key="job_search_query",
+            placeholder="Python developer, data analyst, machine learning engineer",
+        )
+        source = st.selectbox(
+            "Source",
+            ["All", "Adzuna", "Arbeitnow", "Remotive"],
+            key="job_search_source",
+        )
+        skills_filter = st.text_input(
+            "Skills / tags filter",
+            key="job_search_skills_filter",
+            placeholder="Python, FastAPI, ML",
+        )
+    with col_2:
+        location = st.text_input(
+            "Location",
+            key="job_search_location",
+            placeholder="Germany, Berlin, Stuttgart, Remote",
+        )
+        remote_only = st.checkbox("Remote only", key="job_search_remote_only")
+        max_results = st.slider(
+            "Max results",
+            min_value=1,
+            max_value=50,
+            value=25,
+            key="job_search_max_results",
+        )
+
+    if st.button("Search Jobs", type="primary"):
+        try:
+            with st.spinner("Searching jobs..."):
+                results = search_jobs(
+                    query=query,
+                    location=location,
+                    remote_only=remote_only,
+                    source=source,
+                    skills_filter=skills_filter,
+                    max_results=max_results,
+                )
+            st.session_state["latest_job_search_results"] = results
+            st.session_state.pop("selected_job_search_label", None)
+            if not results:
+                st.info("No jobs found for these filters. Try a broader query, different source, or remove filters.")
+        except JobPilotError as exc:
+            st.error(str(exc))
+            st.session_state["latest_job_search_results"] = []
+        except Exception as exc:
+            st.error(f"Something unexpected went wrong during job search: {exc}")
+            st.session_state["latest_job_search_results"] = []
+
+    results: list[JobSearchResult] = st.session_state.get("latest_job_search_results", [])
+    if not results:
+        return
+
+    st.subheader("Results")
+    st.write(f"Found {len(results)} job result(s).")
+    st.dataframe(
+        [
+            {
+                "title": job.title,
+                "company": job.company,
+                "location": job.location,
+                "remote": job.remote,
+                "source": job.source,
+                "published_at": job.published_at,
+                "tags": ", ".join(job.tags),
+            }
+            for job in results
+        ],
+        hide_index=True,
+        use_container_width=True,
+    )
+
+    options = {
+        _job_result_label(index, job): job
+        for index, job in enumerate(results)
+    }
+    selected_label = st.selectbox(
+        "Select a job result",
+        list(options.keys()),
+        key="selected_job_search_label",
+    )
+    selected_job = options[selected_label]
+
+    st.subheader("Selected Job Details")
+    st.write(f"**Title:** {selected_job.title}")
+    st.write(f"**Company:** {selected_job.company}")
+    st.write(f"**Location:** {selected_job.location or 'Not provided'}")
+    st.write(f"**Remote:** {selected_job.remote if selected_job.remote is not None else 'Not provided'}")
+    st.write(f"**Source:** {selected_job.source}")
+    if selected_job.source_url:
+        st.markdown(f"**Source URL:** [{selected_job.source_url}]({selected_job.source_url})")
+    if selected_job.apply_url:
+        st.markdown(f"**Apply/details URL:** [{selected_job.apply_url}]({selected_job.apply_url})")
+    st.write(f"**Salary:** {selected_job.salary or 'Not provided'}")
+    st.write("**Tags:**")
+    render_list(selected_job.tags)
+    st.write("**Description:**")
+    render_text_block(selected_job.description)
+
+    notes = st.text_area(
+        "Notes before saving",
+        key="job_search_save_notes",
+        placeholder="Optional notes for this saved job...",
+    )
+
+    if st.button("Save Selected Job to Tracker"):
+        try:
+            job_id = save_searched_job(
+                title=selected_job.title,
+                company=selected_job.company,
+                location=selected_job.location,
+                work_mode="Remote" if selected_job.remote else "",
+                job_url=selected_job.apply_url or selected_job.source_url,
+                notes=notes,
+            )
+            st.success(f"Saved searched job #{job_id} to the local tracker.")
+        except Exception as exc:
+            st.error(f"Could not save selected job: {exc}")
 
 
 def render_profile_memory_tab() -> None:
@@ -923,10 +1067,11 @@ st.warning(
     "experience, qualifications, companies, dates, tools, metrics, or achievements."
 )
 
-generate_tab, ats_tab, tracker_tab, profile_tab, normalizer_tab, localization_tab = st.tabs(
+generate_tab, ats_tab, search_tab, tracker_tab, profile_tab, normalizer_tab, localization_tab = st.tabs(
     [
         "Generate Application Package",
         "ATS Scanner",
+        "Job Search",
         "Job Tracker",
         "Profile Memory",
         "Profile Normalizer",
@@ -971,6 +1116,9 @@ with generate_tab:
 
 with ats_tab:
     render_ats_scanner_tab()
+
+with search_tab:
+    render_job_search_tab()
 
 with tracker_tab:
     render_tracker_tab()

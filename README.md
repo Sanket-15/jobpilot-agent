@@ -104,6 +104,20 @@ JobPilot must not invent experience, companies, dates, tools, certifications, me
 - No cloud storage.
 - No auto-apply.
 
+### V10 - Job Search + Filtering
+
+- Search jobs from safe API/feed providers.
+- Use Adzuna as the primary provider if API credentials are configured.
+- Use Arbeitnow and Remotive as free/fallback providers.
+- Filter by keyword, location, remote-only, and skills/tags.
+- Review job details before saving.
+- Save selected jobs to the local tracker.
+- No scraping at scale.
+- No browser automation.
+- No login bypass.
+- No auto-apply.
+- No AI ranking yet.
+
 ## How It Works
 
 1. Paste or select a profile.
@@ -147,6 +161,7 @@ jobpilot-agent/
 ├── resume_localizer.py
 ├── job_url_importer.py
 ├── cv_file_importer.py
+├── job_search.py
 ├── requirements.txt
 ├── .env.example
 ├── .gitignore
@@ -183,7 +198,12 @@ Create `.env`:
 
 ```text
 GEMINI_API_KEY=your_api_key_here
+GEMINI_MODEL_NAME=gemini-2.0-flash
+ADZUNA_APP_ID=your_adzuna_app_id_here
+ADZUNA_APP_KEY=your_adzuna_app_key_here
 ```
+
+Adzuna is optional. If `ADZUNA_APP_ID` and `ADZUNA_APP_KEY` are not set, JobPilot will continue using free/fallback providers such as Arbeitnow and Remotive.
 
 Run the app:
 
@@ -199,6 +219,7 @@ streamlit run app.py
 - Saved tracker rows may include a user-provided source job URL.
 - `.env` is ignored by Git.
 - API keys should never be committed.
+- Adzuna credentials are optional and should never be committed.
 - Localized profiles may contain personal data.
 - Localized profiles are saved locally in `data/jobs.db` only when the user clicks Save Localized Profile to Profile Memory.
 - Uploaded CVs may contain personal data.
@@ -216,6 +237,7 @@ Do not use real phone numbers, private emails, birthdates, or full personal CV d
 
 - Job URL import is single-URL only and may fail on blocked, login-only, or JavaScript-rendered pages.
 - CV file import does not support OCR or DOCX yet.
+- Job search uses safe API/feed providers only and does not rank jobs with AI yet.
 - No PDF/DOCX export yet.
 - No authentication.
 - No deployment.
@@ -224,9 +246,10 @@ Do not use real phone numbers, private emails, birthdates, or full personal CV d
 
 ## Roadmap
 
-- Job search and filtering
-- Job ranking
-- Controlled apply flow and application logging
+- V11 Job Ranking
+- V12 Controlled Apply Flow + Application Logging
+- Optional additional providers
+- Optional DOCX/OCR later
 - Optional DOCX/PDF export improvements
 
 ## Demo Data Warning

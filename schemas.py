@@ -145,6 +145,23 @@ class CVFileImportResult(BaseModel):
     warnings: list[str]
 
 
+class JobSearchResult(BaseModel):
+    """Normalized job search result from a safe API/feed provider."""
+
+    source: Literal["Adzuna", "Arbeitnow", "Remotive"]
+    source_url: str
+    title: str
+    company: str
+    location: str | None = None
+    remote: bool | None = None
+    job_type: str | None = None
+    salary: str | None = None
+    tags: list[str]
+    description: str
+    published_at: str | None = None
+    apply_url: str | None = None
+
+
 class ClaimsCheck(BaseModel):
     """Unsupported claim warnings."""
 
