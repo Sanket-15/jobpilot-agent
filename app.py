@@ -3,6 +3,14 @@
 import streamlit as st
 
 from agent import generate_application_package
+from apply_flow import (
+    build_application_message_draft,
+    create_application_log,
+    delete_application_log,
+    get_application_logs,
+    init_application_log_db,
+    update_application_log_notes,
+)
 from ats_scanner import run_ats_scan
 from cv_file_importer import import_cv_file
 from export_utils import (
@@ -742,6 +750,308 @@ def render_job_search_tab() -> None:
     render_rank_search_results_section(results)
 
 
+def render_apply_flow_tab() -> None:
+    """Render controlled manual apply flow and application history."""
+
+    st.header("Apply Flow")
+    st.warning(
+        "JobPilot does not submit applications automatically. Review all materials and submit manually "
+        "through the employer or job portal."
+    )
+
+    try:
+        init_db()
+        init_profile_db()
+        init_application_log_db()
+        jobs = get_all_jobs()
+        profiles = get_all_profiles()
+    except Exception as exc:
+        st.error(f"Could not load apply flow data: {exc}")
+        return
+
+    if not jobs:
+        st.info("No saved jobs yet. Save a job from Job Search, Job Ranking, or Application Package first.")
+        render_application_history([], {})
+        return
+
+    job_options = {
+        _saved_job_label(index, job): job
+        for index, job in enumerate(jobs)
+    }
+    selected_job_label = st.selectbox(
+        "Select saved job",
+        list(job_options.keys()),
+        key="apply_flow_selected_job_label",
+    )
+    selected_job = job_options[selected_job_label]
+
+    st.subheader("Selected Job")
+    col_1, col_2 = st.columns(2)
+    with col_1:
+        st.write(f"**Role:** {selected_job.get('role_title') or 'Not provided'}")
+        st.write(f"**Company:** {selected_job.get('company_name') or 'Not provided'}")
+        st.write(f"**Location:** {selected_job.get('location') or 'Not provided'}")
+        st.write(f"**Current status:** {selected_job.get('status') or 'Not provided'}")
+    with col_2:
+        st.write(f"**Match score:** {_format_optional_score(selected_job.get('match_score'))}")
+        st.write(f"**Match confidence:** {selected_job.get('match_confidence') or 'Not provided'}")
+        if selected_job.get("job_url"):
+            st.markdown(f"**Job URL:** [{selected_job['job_url']}]({selected_job['job_url']})")
+        st.write(f"**Recommended next action:** {selected_job.get('recommended_next_action') or 'Not provided'}")
+
+    st.subheader("Select Profile")
+    selected_profile: dict | None = None
+    if profiles:
+        profile_options = {"No profile selected": None}
+        profile_options.update(
+            {
+                f"{profile['profile_name']} (#{profile['id']})": profile["id"]
+                for profile in profiles
+            }
+        )
+        selected_profile_label = st.selectbox(
+            "Optional saved profile for message draft",
+            list(profile_options.keys()),
+            key="apply_flow_selected_profile_label",
+        )
+        selected_profile_id = profile_options[selected_profile_label]
+        if selected_profile_id is not None:
+            selected_profile = get_profile_by_id(int(selected_profile_id))
+    else:
+        st.info("No saved profiles available. You can still prepare the checklist and log the application.")
+
+    st.subheader("Application Channel")
+    application_channel = st.selectbox(
+        "Application channel",
+        ["Job portal", "Email", "LinkedIn message", "Recruiter message", "Other"],
+        key="apply_flow_channel",
+    )
+
+    st.subheader("Required Package Checklist")
+    col_3, col_4 = st.columns(2)
+    with col_3:
+        cv_ready = st.checkbox("Tailored CV prepared", key="apply_cv_ready")
+        cover_letter_ready = st.checkbox("Cover letter prepared", key="apply_cover_letter_ready")
+        certificates_ready = st.checkbox("Certificates ready", key="apply_certificates_ready")
+        portfolio_link_included = st.checkbox("Portfolio/GitHub link included", key="apply_portfolio_link_included")
+        linkedin_link_included = st.checkbox("LinkedIn link included", key="apply_linkedin_link_included")
+    with col_4:
+        salary_expectation_added = st.checkbox(
+            "Salary expectation added, if required",
+            key="apply_salary_expectation_added",
+        )
+        availability_added = st.checkbox(
+            "Availability / notice period added, if required",
+            key="apply_availability_added",
+        )
+        work_authorization_answered = st.checkbox(
+            "Work authorization answered, if required",
+            key="apply_work_authorization_answered",
+        )
+        reviewed_manually = st.checkbox("Application reviewed manually", key="apply_reviewed_manually")
+        submitted_manually = st.checkbox("Application submitted manually", key="apply_submitted_manually")
+
+    cv_file_note = st.text_input(
+        "CV file/note",
+        key="apply_cv_file_note",
+        placeholder="Sanket_Jain_CV_Tailored_Vonovia.pdf",
+    )
+    cover_letter_file_note = st.text_input(
+        "Cover letter file/note",
+        key="apply_cover_letter_file_note",
+        placeholder="Cover_Letter_Vonovia.pdf",
+    )
+    certificates_note = st.text_input(
+        "Certificates note",
+        key="apply_certificates_note",
+        placeholder="AWS ML certificate, TensorFlow certificate, degree certificates",
+    )
+    follow_up_date = st.text_input(
+        "Follow-up date",
+        key="apply_follow_up_date",
+        placeholder="YYYY-MM-DD",
+    )
+    notes = st.text_area(
+        "Notes",
+        key="apply_notes",
+        placeholder="Notes about this manual application or preparation step...",
+    )
+
+    st.subheader("Optional Application Message Draft")
+    st.caption("Copy-only draft. JobPilot does not send email or submit messages.")
+    tone = st.selectbox(
+        "Tone",
+        ["Professional", "Concise", "Friendly"],
+        key="apply_message_tone",
+    )
+    if st.button("Generate Message Draft"):
+        st.session_state["apply_message_draft"] = build_application_message_draft(
+            selected_job,
+            selected_profile,
+            application_channel,
+            tone=tone,
+        )
+
+    optional_message_draft = st.text_area(
+        "Editable message draft",
+        key="apply_message_draft",
+        height=180,
+        placeholder="Generate a draft or write your own short application message here...",
+    )
+
+    st.subheader("Log Application")
+    if submitted_manually and not reviewed_manually:
+        st.warning("Manual submission can only be logged after you confirm the application was reviewed manually.")
+
+    if st.button("Log Application", type="primary"):
+        if submitted_manually and not reviewed_manually:
+            st.error("Check 'Application reviewed manually' before logging a manual submission.")
+        else:
+            try:
+                log_id = create_application_log(
+                    job_id=int(selected_job["id"]),
+                    application_channel=application_channel,
+                    cv_ready=cv_ready,
+                    cover_letter_ready=cover_letter_ready,
+                    certificates_ready=certificates_ready,
+                    portfolio_link_included=portfolio_link_included,
+                    linkedin_link_included=linkedin_link_included,
+                    salary_expectation_added=salary_expectation_added,
+                    availability_added=availability_added,
+                    work_authorization_answered=work_authorization_answered,
+                    reviewed_manually=reviewed_manually,
+                    submitted_manually=submitted_manually,
+                    cv_file_note=cv_file_note,
+                    cover_letter_file_note=cover_letter_file_note,
+                    certificates_note=certificates_note,
+                    optional_message_draft=optional_message_draft,
+                    follow_up_date=follow_up_date,
+                    notes=notes,
+                )
+                st.session_state["last_application_log_id"] = log_id
+                if submitted_manually:
+                    st.success(f"Logged manual submission as application log #{log_id}. Tracker status is Applied.")
+                else:
+                    st.success(f"Saved preparation log #{log_id}. Tracker status was not changed to Applied.")
+            except ValueError as exc:
+                st.error(str(exc))
+            except Exception as exc:
+                st.error(f"Could not log application: {exc}")
+
+    render_application_history(jobs, {int(job["id"]): job for job in jobs})
+
+
+def render_application_history(jobs: list[dict], jobs_by_id: dict[int, dict]) -> None:
+    """Render application log history controls."""
+
+    st.subheader("Application History")
+    try:
+        filter_options = ["All jobs"]
+        filter_options.extend(_saved_job_label(index, job) for index, job in enumerate(jobs))
+        selected_filter = st.selectbox(
+            "History filter",
+            filter_options,
+            key="application_history_filter",
+        )
+        selected_job_id = None
+        if selected_filter != "All jobs":
+            selected_job = jobs[filter_options.index(selected_filter) - 1]
+            selected_job_id = int(selected_job["id"])
+
+        logs = get_application_logs(selected_job_id)
+    except Exception as exc:
+        st.error(f"Could not load application history: {exc}")
+        return
+
+    if not logs:
+        st.info("No application logs yet.")
+        return
+
+    st.dataframe(
+        [
+            {
+                "date_logged": log.get("date_logged"),
+                "date_applied": log.get("date_applied"),
+                "job": _history_job_name(log, jobs_by_id),
+                "channel": log.get("application_channel"),
+                "submitted_manually": bool(log.get("submitted_manually")),
+                "follow_up_date": log.get("follow_up_date"),
+                "notes": log.get("notes"),
+            }
+            for log in logs
+        ],
+        hide_index=True,
+        use_container_width=True,
+    )
+
+    log_options = {
+        f"Log #{log['id']} - {_history_job_name(log, jobs_by_id)}": log
+        for log in logs
+    }
+    selected_log_label = st.selectbox(
+        "Select a log",
+        list(log_options.keys()),
+        key="selected_application_log_label",
+    )
+    selected_log = log_options[selected_log_label]
+
+    with st.expander("Selected Log Details", expanded=True):
+        for key, value in selected_log.items():
+            st.write(f"**{key}:** {value if value not in (None, '') else 'Not provided'}")
+
+    updated_notes = st.text_area(
+        "Update log notes",
+        value=selected_log.get("notes") or "",
+        key=f"application_log_notes_{selected_log['id']}",
+    )
+    col_1, col_2 = st.columns(2)
+    with col_1:
+        if st.button("Update Log Notes", key=f"update_log_notes_{selected_log['id']}"):
+            try:
+                update_application_log_notes(int(selected_log["id"]), updated_notes)
+                st.success("Updated application log notes.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Could not update log notes: {exc}")
+    with col_2:
+        if st.button("Delete Application Log", key=f"delete_log_{selected_log['id']}"):
+            try:
+                delete_application_log(int(selected_log["id"]))
+                st.success("Deleted application log. The tracker job was not deleted.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Could not delete application log: {exc}")
+
+
+def _saved_job_label(index: int, job: dict) -> str:
+    """Build a stable display label for a saved tracker job."""
+
+    role = job.get("role_title") or "Untitled role"
+    company = job.get("company_name") or "Unknown company"
+    return f"{index + 1}. {role} at {company} (#{job.get('id')})"
+
+
+def _format_optional_score(score: object) -> str:
+    """Render match score without making unscored jobs look scored."""
+
+    if score in (None, ""):
+        return "Not scored"
+    if score == 0:
+        return "Not scored / 0"
+    return str(score)
+
+
+def _history_job_name(log: dict, jobs_by_id: dict[int, dict]) -> str:
+    """Return a readable job name for an application log."""
+
+    job = jobs_by_id.get(int(log.get("job_id", 0)))
+    if not job:
+        return f"Job #{log.get('job_id')}"
+    role = job.get("role_title") or "Untitled role"
+    company = job.get("company_name") or "Unknown company"
+    return f"{role} at {company}"
+
+
 def render_profile_memory_tab() -> None:
     """Render saved candidate profile controls."""
 
@@ -1260,11 +1570,12 @@ st.warning(
     "experience, qualifications, companies, dates, tools, metrics, or achievements."
 )
 
-generate_tab, ats_tab, search_tab, tracker_tab, profile_tab, normalizer_tab, localization_tab = st.tabs(
+generate_tab, ats_tab, search_tab, apply_tab, tracker_tab, profile_tab, normalizer_tab, localization_tab = st.tabs(
     [
         "Generate Application Package",
         "ATS Scanner",
         "Job Search",
+        "Apply Flow",
         "Job Tracker",
         "Profile Memory",
         "Profile Normalizer",
@@ -1312,6 +1623,9 @@ with ats_tab:
 
 with search_tab:
     render_job_search_tab()
+
+with apply_tab:
+    render_apply_flow_tab()
 
 with tracker_tab:
     render_tracker_tab()

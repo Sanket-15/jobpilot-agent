@@ -129,6 +129,22 @@ JobPilot must not invent experience, companies, dates, tools, certifications, me
 - No auto-apply.
 - No mass application generation.
 
+### V12 - Controlled Apply Flow + Application Logging
+
+- Select a saved job.
+- Prepare a manual document checklist.
+- Track CV, cover letter, certificates, links, salary expectation, availability, and work authorization readiness.
+- Generate an optional copy-only application message draft.
+- Confirm manual review and manual submission.
+- Log application activity locally.
+- Update tracker status to Applied after manual submission.
+- View application history.
+- No auto-apply.
+- No job portal submission.
+- No browser automation.
+- No email sending.
+- No cloud storage.
+
 ## How It Works
 
 1. Paste or select a profile.
@@ -136,7 +152,8 @@ JobPilot must not invent experience, companies, dates, tools, certifications, me
 3. Generate an application package.
 4. Review claim warnings.
 5. Export the package or save the job to the tracker.
-6. Prepare the recommended next action.
+6. Search, rank, or prepare saved jobs as needed.
+7. Log manual application activity only after user review/submission.
 
 ## Why This Project Matters
 
@@ -174,6 +191,7 @@ jobpilot-agent/
 ├── cv_file_importer.py
 ├── job_search.py
 ├── job_ranker.py
+├── apply_flow.py
 ├── requirements.txt
 ├── .env.example
 ├── .gitignore
@@ -251,6 +269,9 @@ Do not use real phone numbers, private emails, birthdates, or full personal CV d
 - CV file import does not support OCR or DOCX yet.
 - Job search uses safe API/feed providers only.
 - Job ranking is AI-assisted and user-triggered only.
+- Application logs may contain personal data.
+- Application logs are stored locally in `data/jobs.db` only.
+- JobPilot stores only file names/notes typed by the user, not actual application files.
 - No PDF/DOCX export yet.
 - No authentication.
 - No deployment.
@@ -259,10 +280,10 @@ Do not use real phone numbers, private emails, birthdates, or full personal CV d
 
 ## Roadmap
 
-- V12 Controlled Apply Flow + Application Logging
-- Optional additional providers
-- Optional DOCX/OCR later
-- Optional DOCX/PDF export improvements
+- Additional provider integrations.
+- Optional DOCX/PDF export improvements.
+- Optional OCR.
+- Optional login/cloud sync only if deployed as a real product.
 
 ## Demo Data Warning
 
