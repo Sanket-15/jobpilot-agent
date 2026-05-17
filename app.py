@@ -11,6 +11,7 @@ from export_utils import (
     create_safe_filename,
 )
 from job_url_importer import import_job_from_url
+from job_ranker import rank_jobs_against_profile
 from job_search import adzuna_credentials_configured, search_jobs
 from profile_store import (
     delete_profile,
@@ -25,6 +26,8 @@ from resume_localizer import localize_resume_profile, localized_resume_to_text
 from schemas import (
     ATSScanResult,
     ApplicationPackage,
+    JobRankResult,
+    JobRankingBatch,
     JobSearchResult,
     LocalizedResume,
     NormalizedProfile,
@@ -414,6 +417,192 @@ def _job_result_label(index: int, job: JobSearchResult) -> str:
     return f"{index + 1}. {job.title} - {job.company} ({job.source})"
 
 
+def _ranked_job_label(index: int, ranked_job: JobRankResult) -> str:
+    """Return a compact label for selecting a ranked job."""
+
+    return f"{index + 1}. {ranked_job.match_score}/100 - {ranked_job.title} - {ranked_job.company}"
+
+
+def _ranking_notes(user_notes: str, ranked_job: JobRankResult) -> str:
+    """Append ranking details below user notes without overwriting them."""
+
+    details = [
+        "AI ranking details:",
+        f"Match score: {ranked_job.match_score}/100",
+        f"Match confidence: {ranked_job.match_confidence}",
+        "Strong matches: " + (", ".join(ranked_job.strong_matches) if ranked_job.strong_matches else "None listed"),
+        "Missing or weak skills: "
+        + (", ".join(ranked_job.missing_or_weak_skills) if ranked_job.missing_or_weak_skills else "None listed"),
+        "Risk areas: " + (", ".join(ranked_job.risk_areas) if ranked_job.risk_areas else "None listed"),
+        f"Recommended next action: {ranked_job.recommended_next_action}",
+    ]
+    if user_notes.strip():
+        return user_notes.strip() + "\n\n" + "\n".join(details)
+    return "\n".join(details)
+
+
+def render_rank_search_results_section(results: list[JobSearchResult]) -> None:
+    """Render AI-assisted ranking controls and ranked result details."""
+
+    st.subheader("Rank Search Results")
+    st.warning("Ranking uses AI and may consume API quota. Rank a limited number of jobs at a time.")
+    st.warning("Ranking is an AI-assisted estimate. Review the original job posting before applying.")
+
+    if not results:
+        st.info("Search jobs before ranking.")
+        return
+
+    try:
+        init_profile_db()
+        profiles = get_all_profiles()
+    except Exception as exc:
+        st.error(f"Could not load saved profiles for ranking: {exc}")
+        return
+
+    if not profiles:
+        st.info("No saved profiles available. Create one in Profile Memory or Profile Normalizer before ranking jobs.")
+        return
+
+    profile_options = {
+        f"#{profile['id']} - {profile['profile_name']}": profile for profile in profiles
+    }
+    selected_profile_label = st.selectbox(
+        "Saved profile for ranking",
+        list(profile_options.keys()),
+        key="ranking_profile_selector",
+    )
+    selected_profile = profile_options[selected_profile_label]
+    max_jobs_to_rank = st.slider(
+        "Number of jobs to rank",
+        min_value=1,
+        max_value=min(25, len(results)),
+        value=min(10, len(results)),
+        key="ranking_max_jobs",
+    )
+
+    if st.button("Rank Jobs Against Profile"):
+        try:
+            with st.spinner("Ranking jobs against selected profile..."):
+                ranking = rank_jobs_against_profile(
+                    jobs=results,
+                    candidate_profile=selected_profile.get("profile_text") or "",
+                    max_jobs=max_jobs_to_rank,
+                )
+            st.session_state["latest_job_ranking"] = ranking
+            st.session_state["latest_job_ranking_job_count"] = min(max_jobs_to_rank, len(results))
+            st.session_state.pop("selected_ranked_job_label", None)
+        except JobPilotError as exc:
+            st.error(str(exc))
+        except Exception as exc:
+            st.error(f"Something unexpected went wrong during job ranking: {exc}")
+
+    ranking: JobRankingBatch | None = st.session_state.get("latest_job_ranking")
+    if ranking is None:
+        return
+
+    if st.session_state.get("latest_job_ranking_job_count", 0) != min(max_jobs_to_rank, len(results)):
+        st.caption("Ranking results are from a previous ranking run. Click Rank Jobs Against Profile to refresh.")
+
+    ranked_jobs = [
+        ranked_job
+        for ranked_job in ranking.ranked_jobs
+        if 0 <= ranked_job.result_index < len(results)
+    ]
+    skipped_count = len(ranking.ranked_jobs) - len(ranked_jobs)
+    if skipped_count:
+        st.warning(f"Skipped {skipped_count} ranked item(s) because they did not map to current search results.")
+
+    if not ranked_jobs:
+        st.info("No ranked jobs could be mapped to the current search results.")
+        return
+
+    ranked_jobs.sort(key=lambda item: item.match_score, reverse=True)
+
+    st.subheader("Ranked Jobs")
+    st.dataframe(
+        [
+            {
+                "rank": index + 1,
+                "match_score": ranked_job.match_score,
+                "match_confidence": ranked_job.match_confidence,
+                "title": ranked_job.title,
+                "company": ranked_job.company,
+                "source": ranked_job.source,
+                "recommended_next_action": ranked_job.recommended_next_action,
+            }
+            for index, ranked_job in enumerate(ranked_jobs)
+        ],
+        hide_index=True,
+        use_container_width=True,
+    )
+
+    if ranking.overall_notes:
+        st.write("**Overall notes:**")
+        render_list(ranking.overall_notes)
+
+    ranked_options = {
+        _ranked_job_label(index, ranked_job): ranked_job
+        for index, ranked_job in enumerate(ranked_jobs)
+    }
+    selected_ranked_label = st.selectbox(
+        "Select a ranked job",
+        list(ranked_options.keys()),
+        key="selected_ranked_job_label",
+    )
+    selected_ranked_job = ranked_options[selected_ranked_label]
+    original_job = results[selected_ranked_job.result_index]
+
+    st.subheader("Ranked Job Details")
+    st.metric("Match score", f"{selected_ranked_job.match_score}/100")
+    st.write(f"**Match confidence:** {selected_ranked_job.match_confidence}")
+    st.write(f"**Title:** {selected_ranked_job.title}")
+    st.write(f"**Company:** {selected_ranked_job.company}")
+    st.write(f"**Source:** {selected_ranked_job.source}")
+    if original_job.source_url:
+        st.markdown(f"**Original source URL:** [{original_job.source_url}]({original_job.source_url})")
+    if original_job.apply_url:
+        st.markdown(f"**Apply/details URL:** [{original_job.apply_url}]({original_job.apply_url})")
+
+    st.write("**Strong matches:**")
+    render_list(selected_ranked_job.strong_matches)
+    st.write("**Partial matches:**")
+    render_list(selected_ranked_job.partial_matches)
+    st.write("**Missing or weak skills:**")
+    render_list(selected_ranked_job.missing_or_weak_skills)
+    st.write("**Risk areas:**")
+    render_list(selected_ranked_job.risk_areas)
+    st.write("**Ranking reason:**")
+    st.write(selected_ranked_job.ranking_reason)
+    st.write("**Recommended next action:**")
+    st.info(selected_ranked_job.recommended_next_action)
+
+    ranked_notes = st.text_area(
+        "Notes before saving ranked job",
+        key="ranked_job_save_notes",
+        placeholder="Optional notes for this ranked job...",
+    )
+
+    if st.button("Save Ranked Job to Tracker"):
+        if not (0 <= selected_ranked_job.result_index < len(results)):
+            st.error("Cannot save this ranked job because it no longer maps to the current search results.")
+            return
+
+        try:
+            job_id = save_searched_job(
+                title=original_job.title,
+                company=original_job.company,
+                location=original_job.location,
+                work_mode="Remote" if original_job.remote else "",
+                job_url=original_job.apply_url or original_job.source_url,
+                notes=_ranking_notes(ranked_notes, selected_ranked_job),
+                match_score=selected_ranked_job.match_score,
+                match_confidence=selected_ranked_job.match_confidence,
+            )
+            st.success(f"Saved ranked job #{job_id} to the local tracker.")
+        except Exception as exc:
+            st.error(f"Could not save ranked job: {exc}")
+
+
 def render_job_search_tab() -> None:
     """Render safe API/feed job search and filtering."""
 
@@ -469,6 +658,8 @@ def render_job_search_tab() -> None:
                 )
             st.session_state["latest_job_search_results"] = results
             st.session_state.pop("selected_job_search_label", None)
+            st.session_state.pop("latest_job_ranking", None)
+            st.session_state.pop("selected_ranked_job_label", None)
             if not results:
                 st.info("No jobs found for these filters. Try a broader query, different source, or remove filters.")
         except JobPilotError as exc:
@@ -547,6 +738,8 @@ def render_job_search_tab() -> None:
             st.success(f"Saved searched job #{job_id} to the local tracker.")
         except Exception as exc:
             st.error(f"Could not save selected job: {exc}")
+
+    render_rank_search_results_section(results)
 
 
 def render_profile_memory_tab() -> None:

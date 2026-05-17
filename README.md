@@ -118,6 +118,17 @@ JobPilot must not invent experience, companies, dates, tools, certifications, me
 - No auto-apply.
 - No AI ranking yet.
 
+### V11 - Job Ranking
+
+- Rank searched jobs against a saved profile.
+- Show match score and confidence.
+- Show strong matches, gaps, risks, and next action.
+- Save ranked jobs to tracker.
+- AI ranking is user-triggered.
+- Ranking is limited to avoid unnecessary API usage.
+- No auto-apply.
+- No mass application generation.
+
 ## How It Works
 
 1. Paste or select a profile.
@@ -162,6 +173,7 @@ jobpilot-agent/
 ├── job_url_importer.py
 ├── cv_file_importer.py
 ├── job_search.py
+├── job_ranker.py
 ├── requirements.txt
 ├── .env.example
 ├── .gitignore
@@ -237,7 +249,8 @@ Do not use real phone numbers, private emails, birthdates, or full personal CV d
 
 - Job URL import is single-URL only and may fail on blocked, login-only, or JavaScript-rendered pages.
 - CV file import does not support OCR or DOCX yet.
-- Job search uses safe API/feed providers only and does not rank jobs with AI yet.
+- Job search uses safe API/feed providers only.
+- Job ranking is AI-assisted and user-triggered only.
 - No PDF/DOCX export yet.
 - No authentication.
 - No deployment.
@@ -246,7 +259,6 @@ Do not use real phone numbers, private emails, birthdates, or full personal CV d
 
 ## Roadmap
 
-- V11 Job Ranking
 - V12 Controlled Apply Flow + Application Logging
 - Optional additional providers
 - Optional DOCX/OCR later
