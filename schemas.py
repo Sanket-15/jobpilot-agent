@@ -162,6 +162,30 @@ class JobSearchResult(BaseModel):
     apply_url: str | None = None
 
 
+class JobRankResult(BaseModel):
+    """AI-assisted ranking result for one searched job."""
+
+    result_index: int
+    title: str
+    company: str
+    source: str
+    match_score: int = Field(ge=0, le=100)
+    match_confidence: Literal["high", "medium", "low"]
+    strong_matches: list[str]
+    partial_matches: list[str]
+    missing_or_weak_skills: list[str]
+    risk_areas: list[str]
+    ranking_reason: str
+    recommended_next_action: str
+
+
+class JobRankingBatch(BaseModel):
+    """Batch ranking response for current search results."""
+
+    ranked_jobs: list[JobRankResult]
+    overall_notes: list[str]
+
+
 class ClaimsCheck(BaseModel):
     """Unsupported claim warnings."""
 

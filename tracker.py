@@ -111,6 +111,8 @@ def save_searched_job(
     job_url: str | None = None,
     notes: str = "",
     status: str = "Interested",
+    match_score: int | None = None,
+    match_confidence: str | None = None,
 ) -> int:
     """Save tracker metadata for a searched job without generating a package."""
 
@@ -140,8 +142,8 @@ def save_searched_job(
                 title,
                 location,
                 work_mode,
-                0,
-                "not_scored",
+                match_score if match_score is not None else 0,
+                match_confidence or "not_scored",
                 status,
                 "Review the job details, then generate an application package if it looks relevant.",
                 notes,
