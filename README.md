@@ -169,15 +169,11 @@ JobPilot demonstrates an agentic workflow with orchestration, structured outputs
 
 ## Tech Stack
 
-- Python
-- Streamlit
-- Gemini API
-- Pydantic
-- SQLite
-- python-dotenv
-- requests
-- Beautiful Soup
-- pypdf
+- Python + Streamlit for the local web app.
+- Gemini API for AI-assisted analysis and content generation.
+- Pydantic for structured JSON validation.
+- SQLite for local tracker, profile memory, and application logs.
+- Supporting libraries: `python-dotenv`, `requests`, `beautifulsoup4`, and `pypdf`.
 
 ## Folder Structure
 
