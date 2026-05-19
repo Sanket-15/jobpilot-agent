@@ -53,9 +53,26 @@ from tracker import (
     update_job_notes,
     update_job_status,
 )
+from ui_components import (
+    inject_global_styles,
+    render_card,
+    render_copy_friendly_text,
+    render_feature_badges,
+    render_hero_header,
+    render_info_box,
+    render_list_card,
+    render_score_metric,
+    render_safety_banner,
+    render_section_title,
+    render_status_badge,
+    render_step_header,
+    render_success_box,
+    render_warning_box,
+)
 
 
 st.set_page_config(page_title="JobPilot Agent", page_icon="JP", layout="wide")
+inject_global_styles()
 
 
 def render_list(items: list[str]) -> None:
@@ -94,25 +111,32 @@ def render_skill_evidence(items: list[SkillEvidence]) -> None:
 def render_text_block(text: str) -> None:
     """Render long generated text in a copy-friendly text area."""
 
-    st.text_area(
-        label="Copy-friendly output",
-        value=text or "Not provided.",
-        height=260,
-        label_visibility="collapsed",
-    )
+    render_copy_friendly_text("Copy-friendly output", text, height=260)
 
 
 def render_package(package: ApplicationPackage) -> None:
     """Render all application package sections."""
 
+    st.divider()
+    render_section_title("Results", "Review the generated package before copying or saving anything.")
     st.header("Job Summary")
     job = package.job_info
-    st.write(f"**Company:** {job.company_name or 'Not provided'}")
-    st.write(f"**Role:** {job.role_title or 'Not provided'}")
-    st.write(f"**Location:** {job.location or 'Not provided'}")
-    st.write(f"**Work mode:** {job.work_mode or 'Not provided'}")
-    st.write(f"**Seniority:** {job.seniority or 'Not provided'}")
-    st.write(f"**Deadline:** {job.deadline or 'Not provided'}")
+    summary_cols = st.columns(4)
+    with summary_cols[0]:
+        render_card("Company", job.company_name or "Not provided")
+    with summary_cols[1]:
+        render_card("Role", job.role_title or "Not provided")
+    with summary_cols[2]:
+        render_card("Location", job.location or "Not provided")
+    with summary_cols[3]:
+        render_card("Work mode", job.work_mode or "Not provided")
+    render_feature_badges(
+        [
+            f"Seniority: {job.seniority or 'Not provided'}",
+            f"Deadline: {job.deadline or 'Not provided'}",
+        ],
+        variant="violet",
+    )
     st.write("**Role summary:**")
     st.write(job.role_summary)
 
@@ -130,8 +154,13 @@ def render_package(package: ApplicationPackage) -> None:
 
     st.header("Match Analysis")
     match = package.match_analysis
-    st.metric("Match score", f"{match.match_score}/100")
-    st.write(f"**Confidence:** {match.match_confidence}")
+    metric_cols = st.columns(3)
+    with metric_cols[0]:
+        render_score_metric("Match score", match.match_score)
+    with metric_cols[1]:
+        st.metric("Confidence", match.match_confidence)
+    with metric_cols[2]:
+        st.metric("Integrity", package.claims_check.overall_integrity_status)
     st.write(f"**Strongest application angle:** {match.strongest_application_angle}")
 
     with st.expander("Strong matches", expanded=True):
@@ -166,41 +195,49 @@ def render_package(package: ApplicationPackage) -> None:
 
     st.header("ATS / Keyword Suggestions")
     ats = package.ats_analysis
-    st.subheader("Supported keywords")
-    render_list(ats.supported_keywords)
-    st.subheader("Missing keywords")
-    render_list(ats.missing_keywords)
-    if ats.missing_keywords:
-        st.caption("Only add these keywords to your CV if you have real experience with them.")
-    st.subheader("Needs clarification keywords")
-    render_list(ats.needs_clarification_keywords)
-    st.subheader("Keyword improvement suggestions")
-    render_list(
-        ats.keyword_improvement_suggestions
-        or ["Use missing keywords as learning topics, interview preparation topics, or future upskilling areas."]
-    )
-    st.subheader("Weak bullet point suggestions")
-    render_list(
-        ats.weak_bullet_point_suggestions
-        or ["No major weak bullet points detected in the generated version. Add measurable impact only where true."]
-    )
-    st.subheader("Overused phrases")
-    render_list(ats.overused_phrases)
-    st.subheader("Formatting risks")
-    render_list(
-        ats.formatting_risks
-        or [
-            "No major formatting risks detected from the pasted plain text. If using the original CV file, avoid icons, graphics, and non-standard language rating symbols for ATS compatibility."
-        ]
-    )
+    keyword_cols = st.columns(3)
+    with keyword_cols[0]:
+        st.subheader("Supported keywords")
+        render_feature_badges(ats.supported_keywords or ["No supported keywords detected"], variant="success")
+    with keyword_cols[1]:
+        st.subheader("Missing keywords")
+        render_feature_badges(ats.missing_keywords or ["No missing keywords detected"], variant="danger")
+        if ats.missing_keywords:
+            st.caption("Only add these keywords to your CV if you have real experience with them.")
+    with keyword_cols[2]:
+        st.subheader("Needs clarification")
+        render_feature_badges(ats.needs_clarification_keywords or ["No clarification needs detected"], variant="warning")
+    with st.expander("ATS improvement details", expanded=True):
+        st.subheader("Keyword improvement suggestions")
+        render_list(
+            ats.keyword_improvement_suggestions
+            or ["Use missing keywords as learning topics, interview preparation topics, or future upskilling areas."]
+        )
+        st.subheader("Weak bullet point suggestions")
+        render_list(
+            ats.weak_bullet_point_suggestions
+            or ["No major weak bullet points detected in the generated version. Add measurable impact only where true."]
+        )
+        st.subheader("Overused phrases")
+        render_list(ats.overused_phrases)
+        st.subheader("Formatting risks")
+        render_list(
+            ats.formatting_risks
+            or [
+                "No major formatting risks detected from the pasted plain text. If using the original CV file, avoid icons, graphics, and non-standard language rating symbols for ATS compatibility."
+            ]
+        )
 
     st.header("Unsupported Claims Check")
     claims = package.claims_check
     if claims.overall_integrity_status == "clean":
+        render_status_badge(f"Integrity: {claims.overall_integrity_status}", "success")
         st.success(f"Integrity status: {claims.overall_integrity_status}")
     elif claims.overall_integrity_status == "needs_review":
+        render_status_badge(f"Integrity: {claims.overall_integrity_status}", "warning")
         st.warning(f"Integrity status: {claims.overall_integrity_status}")
     else:
+        render_status_badge(f"Integrity: {claims.overall_integrity_status}", "danger")
         st.error(f"Integrity status: {claims.overall_integrity_status}")
 
     st.subheader("Unsupported claims")
@@ -210,16 +247,16 @@ def render_package(package: ApplicationPackage) -> None:
 
     st.header("Interview Questions")
     interview = package.interview_prep
-    st.subheader("Likely questions")
-    render_list(interview.likely_questions)
-    st.subheader("Technical questions")
-    render_list(interview.technical_questions)
-    st.subheader("Behavioral questions")
-    render_list(interview.behavioral_questions)
-    st.subheader("Gap-based questions")
-    render_list(interview.gap_based_questions)
-    st.subheader("Project explanation prompts")
-    render_list(interview.project_explanation_prompts)
+    with st.expander("Likely questions", expanded=True):
+        render_list(interview.likely_questions)
+    with st.expander("Technical questions"):
+        render_list(interview.technical_questions)
+    with st.expander("Behavioral questions"):
+        render_list(interview.behavioral_questions)
+    with st.expander("Gap-based questions"):
+        render_list(interview.gap_based_questions)
+    with st.expander("Project explanation prompts"):
+        render_list(interview.project_explanation_prompts)
 
     st.header("Recommended Next Action")
     st.info(package.recommended_next_action)
@@ -228,7 +265,8 @@ def render_package(package: ApplicationPackage) -> None:
 def render_save_to_tracker(package: ApplicationPackage) -> None:
     """Render controls for saving the generated package to the local tracker."""
 
-    st.header("Save to Job Tracker")
+    st.header("Save / Export / Next Action")
+    st.subheader("Save to Job Tracker")
     if st.session_state.get("source_job_url"):
         st.caption(f"Source URL will be saved: {st.session_state['source_job_url']}")
 
@@ -253,7 +291,7 @@ def render_save_to_tracker(package: ApplicationPackage) -> None:
 def render_export_section(package: ApplicationPackage) -> None:
     """Render in-memory export download buttons."""
 
-    st.header("Export")
+    st.subheader("Export")
     st.caption("Exports are generated in memory only and are not saved automatically.")
 
     job = package.job_info
@@ -284,41 +322,48 @@ def render_ats_scan_result(result: ATSScanResult) -> None:
     """Render dedicated ATS scanner results."""
 
     st.header("ATS Scan Results")
-    st.metric("ATS score", f"{result.ats_score}/100")
-    st.write(f"**Match confidence:** {result.match_confidence}")
+    score_cols = st.columns(2)
+    with score_cols[0]:
+        render_score_metric("ATS score", result.ats_score)
+    with score_cols[1]:
+        st.metric("Match confidence", result.match_confidence)
     st.warning("Only add keywords or claims to your CV if they reflect your real experience.")
 
-    st.subheader("Supported keywords")
-    render_list(result.supported_keywords)
+    keyword_cols = st.columns(3)
+    with keyword_cols[0]:
+        st.subheader("Supported keywords")
+        render_feature_badges(result.supported_keywords or ["No supported keywords detected"], variant="success")
+    with keyword_cols[1]:
+        st.subheader("Missing keywords")
+        render_feature_badges(result.missing_keywords or ["No missing keywords detected"], variant="danger")
+        if result.missing_keywords:
+            st.caption("Only add missing keywords to your CV if you have real experience with them.")
+    with keyword_cols[2]:
+        st.subheader("Needs clarification")
+        render_feature_badges(result.needs_clarification_keywords or ["No clarification needs detected"], variant="warning")
 
-    st.subheader("Missing keywords")
-    render_list(result.missing_keywords)
-    if result.missing_keywords:
-        st.caption("Only add missing keywords to your CV if you have real experience with them.")
+    with st.expander("Detailed ATS suggestions", expanded=True):
+        st.subheader("Keyword improvement suggestions")
+        render_list(result.keyword_improvement_suggestions)
 
-    st.subheader("Needs clarification keywords")
-    render_list(result.needs_clarification_keywords)
+        st.subheader("Weak bullet point suggestions")
+        render_list(result.weak_bullet_point_suggestions)
 
-    st.subheader("Keyword improvement suggestions")
-    render_list(result.keyword_improvement_suggestions)
+        st.subheader("Formatting risks")
+        render_list(result.formatting_risks)
 
-    st.subheader("Weak bullet point suggestions")
-    render_list(result.weak_bullet_point_suggestions)
+        st.subheader("Overused phrases")
+        render_list(result.overused_phrases)
 
-    st.subheader("Formatting risks")
-    render_list(result.formatting_risks)
+        st.subheader("Suggested skills ordering")
+        render_list(result.suggested_skills_ordering)
 
-    st.subheader("Overused phrases")
-    render_list(result.overused_phrases)
+        st.subheader("Top 5 CV improvements")
+        for index, item in enumerate(result.top_cv_improvements[:5], start=1):
+            render_card(f"Improvement {index}", item)
 
-    st.subheader("Suggested skills ordering")
-    render_list(result.suggested_skills_ordering)
-
-    st.subheader("Top 5 CV improvements")
-    render_list(result.top_cv_improvements[:5])
-
-    st.subheader("Unsupported / risky claim warnings")
-    render_warning_list(result.unsupported_or_risky_claims)
+        st.subheader("Unsupported / risky claim warnings")
+        render_warning_list(result.unsupported_or_risky_claims)
 
     st.subheader("Recommended next action")
     st.info(result.recommended_next_action)
@@ -335,12 +380,29 @@ def render_tracker_tab() -> None:
         return
 
     st.header("Job Tracker")
+    st.caption("Local-only application tracking. Saved rows live in data/jobs.db and can be updated or deleted.")
+    metric_cols = st.columns(5)
+    with metric_cols[0]:
+        st.metric("Total jobs", len(jobs))
+    with metric_cols[1]:
+        st.metric("Interested", sum(1 for job in jobs if job.get("status") == "Interested"))
+    with metric_cols[2]:
+        st.metric("Applied", sum(1 for job in jobs if job.get("status") == "Applied"))
+    with metric_cols[3]:
+        st.metric(
+            "Interviews",
+            sum(1 for job in jobs if job.get("status") in {"Interview scheduled", "Technical interview"}),
+        )
+    with metric_cols[4]:
+        st.metric("Follow-ups", sum(1 for job in jobs if job.get("follow_up_date")))
 
     if not jobs:
         st.info("No saved jobs yet. Generate an application package, then save it to the tracker.")
         return
 
-    status_filter = st.selectbox("Filter by status", ["All"] + ALLOWED_STATUSES)
+    with st.container(border=True):
+        render_section_title("Filters")
+        status_filter = st.selectbox("Filter by status", ["All"] + ALLOWED_STATUSES)
     filtered_jobs = [
         job for job in jobs if status_filter == "All" or job["status"] == status_filter
     ]
@@ -349,24 +411,26 @@ def render_tracker_tab() -> None:
         st.info("No jobs match this status filter.")
         return
 
-    st.dataframe(
-        filtered_jobs,
-        hide_index=True,
-        use_container_width=True,
-        column_order=[
-            "id",
-            "company_name",
-            "role_title",
-            "location",
-            "work_mode",
-            "match_score",
-            "match_confidence",
-            "status",
-            "date_added",
-            "follow_up_date",
-            "job_url",
-        ],
-    )
+    with st.container(border=True):
+        render_section_title("Saved Jobs", f"Showing {len(filtered_jobs)} of {len(jobs)} saved job(s).")
+        st.dataframe(
+            filtered_jobs,
+            hide_index=True,
+            use_container_width=True,
+            column_order=[
+                "id",
+                "company_name",
+                "role_title",
+                "location",
+                "work_mode",
+                "match_score",
+                "match_confidence",
+                "status",
+                "date_added",
+                "follow_up_date",
+                "job_url",
+            ],
+        )
 
     job_options = {
         f"#{job['id']} - {job.get('company_name') or 'Unknown company'} - {job.get('role_title') or 'Unknown role'}": job
@@ -376,7 +440,14 @@ def render_tracker_tab() -> None:
     selected_job = job_options[selected_label]
     job_id = int(selected_job["id"])
 
-    st.subheader("Update Selected Job")
+    with st.container(border=True):
+        render_section_title("Update Selected Job")
+        st.write(f"**Selected:** {selected_label}")
+        st.write("**Recommended next action:**")
+        st.write(selected_job.get("recommended_next_action") or "No recommendation saved.")
+        if selected_job.get("job_url"):
+            st.markdown(f"**Source URL:** [{selected_job['job_url']}]({selected_job['job_url']})")
+
     new_status = st.selectbox(
         "Status",
         ALLOWED_STATUSES,
@@ -390,12 +461,6 @@ def render_tracker_tab() -> None:
         value=selected_job.get("follow_up_date") or "",
         placeholder="YYYY-MM-DD",
     )
-
-    st.write("**Recommended next action:**")
-    st.write(selected_job.get("recommended_next_action") or "No recommendation saved.")
-    if selected_job.get("job_url"):
-        st.write("**Source URL:**")
-        st.write(selected_job["job_url"])
 
     update_col, delete_col = st.columns(2)
     with update_col:
@@ -452,9 +517,10 @@ def _ranking_notes(user_notes: str, ranked_job: JobRankResult) -> str:
 def render_rank_search_results_section(results: list[JobSearchResult]) -> None:
     """Render AI-assisted ranking controls and ranked result details."""
 
-    st.subheader("Rank Search Results")
-    st.warning("Ranking uses AI and may consume API quota. Rank a limited number of jobs at a time.")
-    st.warning("Ranking is an AI-assisted estimate. Review the original job posting before applying.")
+    st.divider()
+    render_section_title("Rank Search Results", "AI-assisted estimates for the current visible search results only.")
+    render_warning_box("Ranking uses AI and may consume API quota. Rank a limited number of jobs at a time.")
+    render_warning_box("Ranking is an estimate. Review the original job before applying.")
 
     if not results:
         st.info("Search jobs before ranking.")
@@ -526,7 +592,16 @@ def render_rank_search_results_section(results: list[JobSearchResult]) -> None:
 
     ranked_jobs.sort(key=lambda item: item.match_score, reverse=True)
 
-    st.subheader("Ranked Jobs")
+    render_section_title("Ranked Jobs")
+    if ranked_jobs:
+        top_job = ranked_jobs[0]
+        metric_cols = st.columns(3)
+        with metric_cols[0]:
+            render_score_metric("Top ranking score", top_job.match_score)
+        with metric_cols[1]:
+            st.metric("Ranked jobs", len(ranked_jobs))
+        with metric_cols[2]:
+            st.metric("Top confidence", top_job.match_confidence)
     st.dataframe(
         [
             {
@@ -560,12 +635,16 @@ def render_rank_search_results_section(results: list[JobSearchResult]) -> None:
     selected_ranked_job = ranked_options[selected_ranked_label]
     original_job = results[selected_ranked_job.result_index]
 
-    st.subheader("Ranked Job Details")
-    st.metric("Match score", f"{selected_ranked_job.match_score}/100")
-    st.write(f"**Match confidence:** {selected_ranked_job.match_confidence}")
+    render_section_title("Ranked Job Details")
+    detail_cols = st.columns(2)
+    with detail_cols[0]:
+        render_score_metric("Match score", selected_ranked_job.match_score)
+    with detail_cols[1]:
+        st.metric("Match confidence", selected_ranked_job.match_confidence)
     st.write(f"**Title:** {selected_ranked_job.title}")
     st.write(f"**Company:** {selected_ranked_job.company}")
-    st.write(f"**Source:** {selected_ranked_job.source}")
+    st.write("**Source:**")
+    render_status_badge(selected_ranked_job.source, "info")
     if original_job.source_url:
         st.markdown(f"**Original source URL:** [{original_job.source_url}]({original_job.source_url})")
     if original_job.apply_url:
@@ -615,43 +694,45 @@ def render_job_search_tab() -> None:
     """Render safe API/feed job search and filtering."""
 
     st.header("Job Search")
-    st.write("Search safe job API/feed providers, review results, and save selected jobs to the local tracker.")
-    st.warning("Search does not generate application packages, rank jobs with AI, or apply automatically.")
+    st.caption("Search safe API/feed providers, review results, and save selected jobs to the local tracker.")
+    render_info_box("Search does not generate application packages, rank jobs with AI, or apply automatically.")
 
     if not adzuna_credentials_configured():
         st.info("Adzuna credentials are not configured. Using free providers only.")
 
-    col_1, col_2 = st.columns(2)
-    with col_1:
-        query = st.text_input(
-            "Keyword / query",
-            key="job_search_query",
-            placeholder="Python developer, data analyst, machine learning engineer",
-        )
-        source = st.selectbox(
-            "Source",
-            ["All", "Adzuna", "Arbeitnow", "Remotive"],
-            key="job_search_source",
-        )
-        skills_filter = st.text_input(
-            "Skills / tags filter",
-            key="job_search_skills_filter",
-            placeholder="Python, FastAPI, ML",
-        )
-    with col_2:
-        location = st.text_input(
-            "Location",
-            key="job_search_location",
-            placeholder="Germany, Berlin, Stuttgart, Remote",
-        )
-        remote_only = st.checkbox("Remote only", key="job_search_remote_only")
-        max_results = st.slider(
-            "Max results",
-            min_value=1,
-            max_value=50,
-            value=25,
-            key="job_search_max_results",
-        )
+    with st.container(border=True):
+        render_section_title("Filters", "Search is provider-based and never calls Gemini.")
+        col_1, col_2 = st.columns(2)
+        with col_1:
+            query = st.text_input(
+                "Keyword / query",
+                key="job_search_query",
+                placeholder="Python developer, data analyst, machine learning engineer",
+            )
+            source = st.selectbox(
+                "Source",
+                ["All", "Adzuna", "Arbeitnow", "Remotive"],
+                key="job_search_source",
+            )
+            skills_filter = st.text_input(
+                "Skills / tags filter",
+                key="job_search_skills_filter",
+                placeholder="Python, FastAPI, ML",
+            )
+        with col_2:
+            location = st.text_input(
+                "Location",
+                key="job_search_location",
+                placeholder="Germany, Berlin, Stuttgart, Remote",
+            )
+            remote_only = st.checkbox("Remote only", key="job_search_remote_only")
+            max_results = st.slider(
+                "Max results",
+                min_value=1,
+                max_value=50,
+                value=25,
+                key="job_search_max_results",
+            )
 
     if st.button("Search Jobs", type="primary"):
         try:
@@ -681,8 +762,8 @@ def render_job_search_tab() -> None:
     if not results:
         return
 
-    st.subheader("Results")
-    st.write(f"Found {len(results)} job result(s).")
+    render_section_title("Results")
+    st.metric("Search results", len(results))
     st.dataframe(
         [
             {
@@ -711,12 +792,14 @@ def render_job_search_tab() -> None:
     )
     selected_job = options[selected_label]
 
-    st.subheader("Selected Job Details")
+    render_section_title("Selected Job Details", "Review the source listing before saving it to the tracker.")
     st.write(f"**Title:** {selected_job.title}")
     st.write(f"**Company:** {selected_job.company}")
     st.write(f"**Location:** {selected_job.location or 'Not provided'}")
-    st.write(f"**Remote:** {selected_job.remote if selected_job.remote is not None else 'Not provided'}")
-    st.write(f"**Source:** {selected_job.source}")
+    st.write("**Remote:**")
+    render_status_badge("Remote" if selected_job.remote else "Not remote / unclear", "success" if selected_job.remote else "neutral")
+    st.write("**Source:**")
+    render_status_badge(selected_job.source, "info")
     if selected_job.source_url:
         st.markdown(f"**Source URL:** [{selected_job.source_url}]({selected_job.source_url})")
     if selected_job.apply_url:
@@ -724,28 +807,30 @@ def render_job_search_tab() -> None:
     st.write(f"**Salary:** {selected_job.salary or 'Not provided'}")
     st.write("**Tags:**")
     render_list(selected_job.tags)
-    st.write("**Description:**")
-    render_text_block(selected_job.description)
+    with st.expander("Description", expanded=True):
+        render_text_block(selected_job.description)
 
-    notes = st.text_area(
-        "Notes before saving",
-        key="job_search_save_notes",
-        placeholder="Optional notes for this saved job...",
-    )
+    with st.container(border=True):
+        render_section_title("Save to Tracker")
+        notes = st.text_area(
+            "Notes before saving",
+            key="job_search_save_notes",
+            placeholder="Optional notes for this saved job...",
+        )
 
-    if st.button("Save Selected Job to Tracker"):
-        try:
-            job_id = save_searched_job(
-                title=selected_job.title,
-                company=selected_job.company,
-                location=selected_job.location,
-                work_mode="Remote" if selected_job.remote else "",
-                job_url=selected_job.apply_url or selected_job.source_url,
-                notes=notes,
-            )
-            st.success(f"Saved searched job #{job_id} to the local tracker.")
-        except Exception as exc:
-            st.error(f"Could not save selected job: {exc}")
+        if st.button("Save Selected Job to Tracker"):
+            try:
+                job_id = save_searched_job(
+                    title=selected_job.title,
+                    company=selected_job.company,
+                    location=selected_job.location,
+                    work_mode="Remote" if selected_job.remote else "",
+                    job_url=selected_job.apply_url or selected_job.source_url,
+                    notes=notes,
+                )
+                st.success(f"Saved searched job #{job_id} to the local tracker.")
+            except Exception as exc:
+                st.error(f"Could not save selected job: {exc}")
 
     render_rank_search_results_section(results)
 
@@ -754,10 +839,8 @@ def render_apply_flow_tab() -> None:
     """Render controlled manual apply flow and application history."""
 
     st.header("Apply Flow")
-    st.warning(
-        "JobPilot does not submit applications automatically. Review all materials and submit manually "
-        "through the employer or job portal."
-    )
+    st.caption("Prepare, review, and log a manual application for a saved tracker job.")
+    render_warning_box("JobPilot does not submit applications automatically.")
 
     try:
         init_db()
@@ -774,88 +857,95 @@ def render_apply_flow_tab() -> None:
         render_application_history([], {})
         return
 
-    job_options = {
-        _saved_job_label(index, job): job
-        for index, job in enumerate(jobs)
-    }
-    selected_job_label = st.selectbox(
-        "Select saved job",
-        list(job_options.keys()),
-        key="apply_flow_selected_job_label",
-    )
-    selected_job = job_options[selected_job_label]
+    with st.container(border=True):
+        render_step_header(1, "Select Job", "Choose one saved tracker job to prepare or log.")
+        job_options = {
+            _saved_job_label(index, job): job
+            for index, job in enumerate(jobs)
+        }
+        selected_job_label = st.selectbox(
+            "Select saved job",
+            list(job_options.keys()),
+            key="apply_flow_selected_job_label",
+        )
+        selected_job = job_options[selected_job_label]
 
-    st.subheader("Selected Job")
-    col_1, col_2 = st.columns(2)
-    with col_1:
-        st.write(f"**Role:** {selected_job.get('role_title') or 'Not provided'}")
-        st.write(f"**Company:** {selected_job.get('company_name') or 'Not provided'}")
-        st.write(f"**Location:** {selected_job.get('location') or 'Not provided'}")
-        st.write(f"**Current status:** {selected_job.get('status') or 'Not provided'}")
-    with col_2:
-        st.write(f"**Match score:** {_format_optional_score(selected_job.get('match_score'))}")
-        st.write(f"**Match confidence:** {selected_job.get('match_confidence') or 'Not provided'}")
-        if selected_job.get("job_url"):
-            st.markdown(f"**Job URL:** [{selected_job['job_url']}]({selected_job['job_url']})")
-        st.write(f"**Recommended next action:** {selected_job.get('recommended_next_action') or 'Not provided'}")
+        metric_cols = st.columns(3)
+        with metric_cols[0]:
+            render_score_metric("Match score", selected_job.get("match_score"))
+        with metric_cols[1]:
+            st.metric("Status", selected_job.get("status") or "Not provided")
+        with metric_cols[2]:
+            st.metric("Confidence", selected_job.get("match_confidence") or "Not provided")
 
-    st.subheader("Select Profile")
-    selected_profile: dict | None = None
-    if profiles:
-        profile_options = {"No profile selected": None}
-        profile_options.update(
-            {
-                f"{profile['profile_name']} (#{profile['id']})": profile["id"]
-                for profile in profiles
-            }
-        )
-        selected_profile_label = st.selectbox(
-            "Optional saved profile for message draft",
-            list(profile_options.keys()),
-            key="apply_flow_selected_profile_label",
-        )
-        selected_profile_id = profile_options[selected_profile_label]
-        if selected_profile_id is not None:
-            selected_profile = get_profile_by_id(int(selected_profile_id))
-    else:
-        st.info("No saved profiles available. You can still prepare the checklist and log the application.")
+        col_1, col_2 = st.columns(2)
+        with col_1:
+            st.write(f"**Role:** {selected_job.get('role_title') or 'Not provided'}")
+            st.write(f"**Company:** {selected_job.get('company_name') or 'Not provided'}")
+            st.write(f"**Location:** {selected_job.get('location') or 'Not provided'}")
+        with col_2:
+            if selected_job.get("job_url"):
+                st.markdown(f"**Job URL:** [{selected_job['job_url']}]({selected_job['job_url']})")
+            st.write(f"**Recommended next action:** {selected_job.get('recommended_next_action') or 'Not provided'}")
 
-    st.subheader("Application Channel")
-    application_channel = st.selectbox(
-        "Application channel",
-        ["Job portal", "Email", "LinkedIn message", "Recruiter message", "Other"],
-        key="apply_flow_channel",
-    )
+        selected_profile: dict | None = None
+        if profiles:
+            profile_options = {"No profile selected": None}
+            profile_options.update(
+                {
+                    f"{profile['profile_name']} (#{profile['id']})": profile["id"]
+                    for profile in profiles
+                }
+            )
+            selected_profile_label = st.selectbox(
+                "Optional saved profile for message draft",
+                list(profile_options.keys()),
+                key="apply_flow_selected_profile_label",
+            )
+            selected_profile_id = profile_options[selected_profile_label]
+            if selected_profile_id is not None:
+                selected_profile = get_profile_by_id(int(selected_profile_id))
+        else:
+            st.info("No saved profiles available. You can still prepare the checklist and log the application.")
 
-    st.subheader("Required Package Checklist")
-    col_3, col_4 = st.columns(2)
-    with col_3:
-        cv_ready = st.checkbox("Tailored CV prepared", key="apply_cv_ready")
-        cover_letter_ready = st.checkbox("Cover letter prepared", key="apply_cover_letter_ready")
-        certificates_ready = st.checkbox("Certificates ready", key="apply_certificates_ready")
-        portfolio_link_included = st.checkbox("Portfolio/GitHub link included", key="apply_portfolio_link_included")
-        linkedin_link_included = st.checkbox("LinkedIn link included", key="apply_linkedin_link_included")
-    with col_4:
-        salary_expectation_added = st.checkbox(
-            "Salary expectation added, if required",
-            key="apply_salary_expectation_added",
+        application_channel = st.selectbox(
+            "Application channel",
+            ["Job portal", "Email", "LinkedIn message", "Recruiter message", "Other"],
+            key="apply_flow_channel",
         )
-        availability_added = st.checkbox(
-            "Availability / notice period added, if required",
-            key="apply_availability_added",
-        )
-        work_authorization_answered = st.checkbox(
-            "Work authorization answered, if required",
-            key="apply_work_authorization_answered",
-        )
-        reviewed_manually = st.checkbox("Application reviewed manually", key="apply_reviewed_manually")
-        submitted_manually = st.checkbox("Application submitted manually", key="apply_submitted_manually")
+
+    with st.container(border=True):
+        render_step_header(2, "Prepare Documents", "Track readiness without uploading or storing files.")
+        render_feature_badges(["Documents", "Links", "Required answers", "Manual confirmation"], variant="violet")
+        col_3, col_4 = st.columns(2)
+        with col_3:
+            cv_ready = st.checkbox("Tailored CV prepared", key="apply_cv_ready")
+            cover_letter_ready = st.checkbox("Cover letter prepared", key="apply_cover_letter_ready")
+            certificates_ready = st.checkbox("Certificates ready", key="apply_certificates_ready")
+            portfolio_link_included = st.checkbox("Portfolio/GitHub link included", key="apply_portfolio_link_included")
+            linkedin_link_included = st.checkbox("LinkedIn link included", key="apply_linkedin_link_included")
+        with col_4:
+            salary_expectation_added = st.checkbox(
+                "Salary expectation added, if required",
+                key="apply_salary_expectation_added",
+            )
+            availability_added = st.checkbox(
+                "Availability / notice period added, if required",
+                key="apply_availability_added",
+            )
+            work_authorization_answered = st.checkbox(
+                "Work authorization answered, if required",
+                key="apply_work_authorization_answered",
+            )
+            reviewed_manually = st.checkbox("Application reviewed manually", key="apply_reviewed_manually")
+            submitted_manually = st.checkbox("Application submitted manually", key="apply_submitted_manually")
 
     cv_file_note = st.text_input(
         "CV file/note",
         key="apply_cv_file_note",
         placeholder="Sanket_Jain_CV_Tailored_Vonovia.pdf",
     )
+    st.caption("Store filenames or notes only. JobPilot does not store actual attachment files.")
     cover_letter_file_note = st.text_input(
         "Cover letter file/note",
         key="apply_cover_letter_file_note",
@@ -877,8 +967,7 @@ def render_apply_flow_tab() -> None:
         placeholder="Notes about this manual application or preparation step...",
     )
 
-    st.subheader("Optional Application Message Draft")
-    st.caption("Copy-only draft. JobPilot does not send email or submit messages.")
+    render_step_header(3, "Optional Message Draft", "Copy-only draft. JobPilot does not send email or submit messages.")
     tone = st.selectbox(
         "Tone",
         ["Professional", "Concise", "Friendly"],
@@ -899,7 +988,7 @@ def render_apply_flow_tab() -> None:
         placeholder="Generate a draft or write your own short application message here...",
     )
 
-    st.subheader("Log Application")
+    render_step_header(4, "Confirm Manual Submission")
     if submitted_manually and not reviewed_manually:
         st.warning("Manual submission can only be logged after you confirm the application was reviewed manually.")
 
@@ -944,7 +1033,7 @@ def render_apply_flow_tab() -> None:
 def render_application_history(jobs: list[dict], jobs_by_id: dict[int, dict]) -> None:
     """Render application log history controls."""
 
-    st.subheader("Application History")
+    render_step_header(5, "Application History", "Review, update, or delete local application log entries.")
     try:
         filter_options = ["All jobs"]
         filter_options.extend(_saved_job_label(index, job) for index, job in enumerate(jobs))
@@ -1063,15 +1152,17 @@ def render_profile_memory_tab() -> None:
         return
 
     st.header("Profile Memory")
+    st.caption("Create, edit, and reuse candidate profiles across generation, ATS scanning, ranking, and localization.")
     st.info("Saved profiles are stored locally only in data/jobs.db. You can delete them at any time.")
+    st.metric("Saved profiles", len(profiles))
 
     with st.form("create_profile_form"):
-        st.subheader("Create Profile")
-        profile_name = st.text_input("Profile name")
-        candidate_name = st.text_input("Candidate name")
-        target_roles = st.text_input("Target roles")
-        preferred_locations = st.text_input("Preferred locations")
-        profile_text = st.text_area("Profile text / CV text", height=260)
+        render_section_title("Create Profile", "Manual paste remains supported. Review profile text before saving.")
+        profile_name = st.text_input("Profile name", placeholder="Data Profile - English")
+        candidate_name = st.text_input("Candidate name", placeholder="Optional")
+        target_roles = st.text_input("Target roles", placeholder="Data Analyst, ML Engineer")
+        preferred_locations = st.text_input("Preferred locations", placeholder="Germany, Remote")
+        profile_text = st.text_area("Profile text / CV text", height=260, placeholder="Paste the reusable candidate profile here...")
         submitted = st.form_submit_button("Save Profile")
 
         if submitted:
@@ -1090,7 +1181,7 @@ def render_profile_memory_tab() -> None:
             except Exception as exc:
                 st.error(f"Could not save profile: {exc}")
 
-    st.subheader("Saved Profiles")
+    render_section_title("Saved Profiles")
     if not profiles:
         st.info("No saved profiles yet.")
         return
@@ -1119,7 +1210,7 @@ def render_profile_memory_tab() -> None:
     selected_profile_id = int(selected_profile["id"])
 
     with st.form("edit_profile_form"):
-        st.subheader("Edit Selected Profile")
+        render_section_title("Edit Selected Profile", "Changes update the local saved profile only.")
         edit_profile_name = st.text_input(
             "Profile name",
             value=selected_profile.get("profile_name") or "",
@@ -1179,8 +1270,11 @@ def render_normalized_profile_result(result: NormalizedProfile) -> None:
 
     st.header("Normalized Profile")
 
-    st.write(f"**Detected candidate name:** {result.candidate_name or 'Not provided'}")
-    st.write(f"**Suggested profile name:** {result.suggested_profile_name or 'Not provided'}")
+    info_cols = st.columns(2)
+    with info_cols[0]:
+        st.write(f"**Detected candidate name:** {result.candidate_name or 'Not provided'}")
+    with info_cols[1]:
+        st.write(f"**Suggested profile name:** {result.suggested_profile_name or 'Not provided'}")
 
     st.subheader("Target roles")
     render_list(result.target_roles)
@@ -1212,53 +1306,56 @@ def render_profile_normalizer_tab() -> None:
     """Render paste-based profile import and normalization."""
 
     st.header("Profile Normalizer")
-    st.write("Paste messy CV, profile, or LinkedIn-style text and convert it into a clean reusable profile.")
+    st.caption("Paste messy CV, profile, or LinkedIn-style text and convert it into a clean reusable profile.")
     st.warning("Review and edit the normalized profile before saving it to Profile Memory.")
 
-    st.subheader("CV File Import")
-    st.warning("Uploaded CV files are processed locally in memory. Review extracted text before normalization or saving.")
-    uploaded_cv = st.file_uploader(
-        "Upload CV/profile file",
-        type=["pdf", "tex", "txt", "md"],
-        key="cv_file_import_upload",
-    )
+    with st.container(border=True):
+        render_section_title("CV File Import", "Optional. Imported text stays editable and is not normalized automatically.")
+        st.warning("Uploaded CV files are processed locally in memory. Review extracted text before normalization or saving.")
+        uploaded_cv = st.file_uploader(
+            "Upload CV/profile file",
+            type=["pdf", "tex", "txt", "md"],
+            key="cv_file_import_upload",
+        )
 
-    if st.button("Import CV File"):
-        if uploaded_cv is None:
-            st.warning("Please select a CV/profile file before importing.")
-        else:
-            try:
-                result = import_cv_file(uploaded_cv.name, uploaded_cv.getvalue())
-                st.session_state["cv_import_extracted_text"] = result.extracted_text
-                st.session_state["cv_import_warnings"] = result.warnings
+        if st.button("Import CV File"):
+            if uploaded_cv is None:
+                st.warning("Please select a CV/profile file before importing.")
+            else:
+                try:
+                    result = import_cv_file(uploaded_cv.name, uploaded_cv.getvalue())
+                    st.session_state["cv_import_extracted_text"] = result.extracted_text
+                    st.session_state["cv_import_warnings"] = result.warnings
 
-                if result.extraction_status == "failed":
-                    st.error("Could not extract enough readable CV text. Please paste the text manually.")
-                else:
-                    st.session_state["normalizer_raw_profile_text"] = result.extracted_text
-                    if result.extraction_status == "success":
-                        st.success("Imported CV text. Please review and edit it before normalization.")
+                    if result.extraction_status == "failed":
+                        st.error("Could not extract enough readable CV text. Please paste the text manually.")
                     else:
-                        st.warning("Imported partial CV text. Please review and edit it before normalization.")
-            except JobPilotError as exc:
-                st.error(str(exc))
-            except Exception as exc:
-                st.error(f"Could not import this CV file: {exc}")
+                        st.session_state["normalizer_raw_profile_text"] = result.extracted_text
+                        if result.extraction_status == "success":
+                            st.success("Imported CV text. Please review and edit it before normalization.")
+                        else:
+                            st.warning("Imported partial CV text. Please review and edit it before normalization.")
+                except JobPilotError as exc:
+                    st.error(str(exc))
+                except Exception as exc:
+                    st.error(f"Could not import this CV file: {exc}")
 
     for warning in st.session_state.get("cv_import_warnings", []):
         st.warning(warning)
 
-    raw_profile_text = st.text_area(
-        "Raw profile / CV / LinkedIn-style text",
-        height=300,
-        key="normalizer_raw_profile_text",
-        placeholder="Paste raw profile, CV, or LinkedIn-style text here...",
-    )
-    optional_profile_name = st.text_input(
-        "Optional profile name",
-        key="normalizer_profile_name",
-        placeholder="Leave blank to use the suggested profile name",
-    )
+    with st.container(border=True):
+        render_section_title("Inputs", "Text remains editable before normalization.")
+        raw_profile_text = st.text_area(
+            "Raw profile / CV / LinkedIn-style text",
+            height=300,
+            key="normalizer_raw_profile_text",
+            placeholder="Paste raw profile, CV, or LinkedIn-style text here...",
+        )
+        optional_profile_name = st.text_input(
+            "Optional profile name",
+            key="normalizer_profile_name",
+            placeholder="Leave blank to use the suggested profile name",
+        )
 
     if st.button("Normalize Profile", type="primary"):
         try:
@@ -1306,10 +1403,15 @@ def render_localized_resume_result(result: LocalizedResume) -> None:
 
     st.header("Localized Resume/Profile")
 
-    st.write(f"**Detected source language:** {result.detected_source_language or 'Unknown'}")
-    st.write(f"**Target language:** {result.target_language or 'Not provided'}")
-    st.write(f"**Target market:** {result.target_market or 'Not provided'}")
-    st.write(f"**Tone:** {result.tone or 'Not provided'}")
+    info_cols = st.columns(4)
+    with info_cols[0]:
+        st.metric("Detected source", result.detected_source_language or "Unknown")
+    with info_cols[1]:
+        st.metric("Target language", result.target_language or "Not provided")
+    with info_cols[2]:
+        st.metric("Target market", result.target_market or "Not provided")
+    with info_cols[3]:
+        st.metric("Tone", result.tone or "Not provided")
 
     st.subheader("Localized professional summary")
     st.write(result.localized_professional_summary or "No summary provided.")
@@ -1340,45 +1442,47 @@ def render_resume_localization_tab() -> None:
     """Render paste-based resume/profile localization."""
 
     st.header("Resume Localization")
-    st.write("Paste an English, German, or mixed CV/profile and localize it for a target market.")
+    st.caption("Paste an English, German, or mixed CV/profile and localize it for a target market.")
     st.warning("Review and edit localized content before saving it to Profile Memory.")
 
-    profile_text = st.text_area(
-        "CV/profile text",
-        height=300,
-        key="localizer_profile_text",
-        placeholder="Paste CV or profile text here...",
-    )
-
-    col_1, col_2 = st.columns(2)
-    with col_1:
-        source_language = st.selectbox(
-            "Source language",
-            ["Auto-detect", "English", "German"],
-            key="localizer_source_language",
-        )
-        target_market = st.selectbox(
-            "Target market",
-            ["Germany", "International / English-speaking"],
-            key="localizer_target_market",
-        )
-    with col_2:
-        target_language = st.selectbox(
-            "Target language",
-            ["English", "German"],
-            key="localizer_target_language",
-        )
-        tone = st.selectbox(
-            "Tone",
-            ["Professional", "Concise", "Modern"],
-            key="localizer_tone",
+    with st.container(border=True):
+        render_section_title("Inputs", "Localized text remains editable before saving.")
+        profile_text = st.text_area(
+            "CV/profile text",
+            height=300,
+            key="localizer_profile_text",
+            placeholder="Paste CV or profile text here...",
         )
 
-    optional_profile_name = st.text_input(
-        "Optional profile name",
-        key="localizer_profile_name",
-        placeholder="Leave blank to use a safe default",
-    )
+        col_1, col_2 = st.columns(2)
+        with col_1:
+            source_language = st.selectbox(
+                "Source language",
+                ["Auto-detect", "English", "German"],
+                key="localizer_source_language",
+            )
+            target_market = st.selectbox(
+                "Target market",
+                ["Germany", "International / English-speaking"],
+                key="localizer_target_market",
+            )
+        with col_2:
+            target_language = st.selectbox(
+                "Target language",
+                ["English", "German"],
+                key="localizer_target_language",
+            )
+            tone = st.selectbox(
+                "Tone",
+                ["Professional", "Concise", "Modern"],
+                key="localizer_tone",
+            )
+
+        optional_profile_name = st.text_input(
+            "Optional profile name",
+            key="localizer_profile_name",
+            placeholder="Leave blank to use a safe default",
+        )
 
     if st.button("Localize Resume/Profile", type="primary"):
         try:
@@ -1483,24 +1587,26 @@ def render_ats_scanner_tab() -> None:
     """Render the dedicated ATS scanner mode."""
 
     st.header("ATS Scanner")
-    st.write("Paste a job description and CV/profile to scan keyword fit, gaps, and resume clarity.")
+    st.caption("Paste a job description and CV/profile to scan keyword fit, gaps, and resume clarity.")
     st.warning("Only add keywords or claims to your CV if they reflect your real experience.")
 
-    ats_job_description = st.text_area(
-        "ATS job description",
-        height=260,
-        placeholder="Paste the target job description here...",
-        key="ats_job_description_input",
-    )
+    with st.container(border=True):
+        render_section_title("Inputs")
+        ats_job_description = st.text_area(
+            "ATS job description",
+            height=260,
+            placeholder="Paste the target job description here...",
+            key="ats_job_description_input",
+        )
 
-    render_profile_source_controls("ats_candidate_profile_input", "ATS scanner")
+        render_profile_source_controls("ats_candidate_profile_input", "ATS scanner")
 
-    ats_candidate_profile = st.text_area(
-        "Resume / CV text",
-        key="ats_candidate_profile_input",
-        height=260,
-        placeholder="Paste the resume, CV text, or candidate profile here...",
-    )
+        ats_candidate_profile = st.text_area(
+            "Resume / CV text",
+            key="ats_candidate_profile_input",
+            height=260,
+            placeholder="Paste the resume, CV text, or candidate profile here...",
+        )
 
     if st.button("Run ATS Scan", type="primary"):
         try:
@@ -1519,60 +1625,58 @@ def render_ats_scanner_tab() -> None:
 def render_job_url_import_section() -> None:
     """Render single URL job description import controls."""
 
-    st.subheader("Job URL Import")
-    st.caption(
-        "Optional: paste one job posting URL. JobPilot will try to extract text, then you can review and edit it below."
-    )
+    with st.container(border=True):
+        render_section_title(
+            "Job URL Import",
+            "Optional: paste one job posting URL. Review and edit extracted text before generating.",
+        )
 
-    job_url = st.text_input(
-        "Job posting URL",
-        key="job_url_input",
-        placeholder="https://example.com/jobs/software-developer",
-    )
+        job_url = st.text_input(
+            "Job posting URL",
+            key="job_url_input",
+            placeholder="https://example.com/jobs/software-developer",
+        )
 
-    if st.button("Import Job Description from URL"):
-        try:
-            with st.spinner("Importing job description from URL..."):
-                result = import_job_from_url(job_url)
+        if st.button("Import Job Description from URL"):
+            try:
+                with st.spinner("Importing job description from URL..."):
+                    result = import_job_from_url(job_url)
 
-            if result.extraction_status == "failed":
+                if result.extraction_status == "failed":
+                    st.session_state["source_job_url"] = result.source_url
+                    for warning in result.warnings:
+                        st.warning(warning)
+                    st.error(
+                        "Could not extract this job posting automatically. Please paste the job description manually."
+                    )
+                    return
+
+                st.session_state["job_description_input"] = result.extracted_text
                 st.session_state["source_job_url"] = result.source_url
+
+                if result.extraction_status == "success":
+                    st.success("Imported job text. Please review and edit it before generating.")
+                else:
+                    st.warning("Imported partial job text. Please review and edit it before generating.")
+
                 for warning in result.warnings:
                     st.warning(warning)
-                st.error(
-                    "Could not extract this job posting automatically. Please paste the job description manually."
-                )
-                return
-
-            st.session_state["job_description_input"] = result.extracted_text
-            st.session_state["source_job_url"] = result.source_url
-
-            if result.extraction_status == "success":
-                st.success("Imported job text. Please review and edit it before generating.")
-            else:
-                st.warning("Imported partial job text. Please review and edit it before generating.")
-
-            for warning in result.warnings:
-                st.warning(warning)
-        except JobPilotError as exc:
-            st.error(str(exc))
-        except Exception as exc:
-            st.error(f"Could not import this job posting automatically: {exc}")
+            except JobPilotError as exc:
+                st.error(str(exc))
+            except Exception as exc:
+                st.error(f"Could not import this job posting automatically: {exc}")
 
 
-st.title("JobPilot Agent")
-st.write(
-    "A local AI job-search assistant that helps turn a job description and candidate profile "
-    "into a complete, reviewable application package."
-)
-st.warning(
+render_hero_header()
+render_safety_banner()
+render_warning_box(
     "Review all generated CV and cover letter content before using it. JobPilot should not invent "
     "experience, qualifications, companies, dates, tools, metrics, or achievements."
 )
 
 generate_tab, ats_tab, search_tab, apply_tab, tracker_tab, profile_tab, normalizer_tab, localization_tab = st.tabs(
     [
-        "Generate Application Package",
+        "Generate Package",
         "ATS Scanner",
         "Job Search",
         "Apply Flow",
@@ -1584,6 +1688,7 @@ generate_tab, ats_tab, search_tab, apply_tab, tracker_tab, profile_tab, normaliz
 )
 
 with generate_tab:
+    render_section_title("Inputs", "Paste manually or import a single job URL, then review all text before generation.")
     render_job_url_import_section()
 
     job_description = st.text_area(
@@ -1615,8 +1720,8 @@ with generate_tab:
     if "last_application_package" in st.session_state:
         current_package = st.session_state["last_application_package"]
         render_package(current_package)
-        render_export_section(current_package)
         render_save_to_tracker(current_package)
+        render_export_section(current_package)
 
 with ats_tab:
     render_ats_scanner_tab()

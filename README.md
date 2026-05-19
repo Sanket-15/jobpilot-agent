@@ -145,6 +145,14 @@ JobPilot must not invent experience, companies, dates, tools, certifications, me
 - No email sending.
 - No cloud storage.
 
+### UI Polish
+
+- Modern Streamlit dashboard layout.
+- Card-based sections with improved spacing and readability.
+- Step-based Apply Flow.
+- Cleaner job search and ranking interface.
+- More visual score, status, keyword, and safety indicators.
+
 ## How It Works
 
 1. Paste or select a profile.
