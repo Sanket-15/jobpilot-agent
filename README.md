@@ -289,6 +289,3 @@ Do not use real phone numbers, private emails, birthdates, or full personal CV d
 - Optional OCR.
 - Optional login/cloud sync only if deployed as a real product.
 
-## Demo Data Warning
-
-Use fake demo data in GitHub screenshots and portfolio demos. Do not include real phone numbers, private emails, birthdates, or full personal CV data.
