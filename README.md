@@ -179,6 +179,7 @@ JobPilot demonstrates an agentic workflow with orchestration, structured outputs
 
 ```text
 jobpilot-agent/
+├── .github/workflows/ci.yml
 ├── app.py
 ├── agent.py
 ├── skills.py
@@ -196,6 +197,9 @@ jobpilot-agent/
 ├── job_search.py
 ├── job_ranker.py
 ├── apply_flow.py
+├── ui_components.py
+├── tests/
+├── LICENSE
 ├── requirements.txt
 ├── .env.example
 ├── .gitignore
@@ -245,6 +249,17 @@ Run the app:
 streamlit run app.py
 ```
 
+## Validation
+
+Run these checks before opening a pull request:
+
+```bash
+python -m compileall .
+python -m pytest
+```
+
+The GitHub Actions workflow runs the same validation on pull requests and pushes to `main`.
+
 ## Privacy And Safety Notes
 
 - `data/jobs.db` stores local tracker and saved profile data.
@@ -281,6 +296,18 @@ Do not use real phone numbers, private emails, birthdates, or full personal CV d
 - No deployment.
 - No automatic job applications.
 - AI output requires human review.
+
+## Troubleshooting
+
+- **Missing `GEMINI_API_KEY`:** Add `GEMINI_API_KEY=your_api_key_here` to `.env`. AI-assisted flows will fail gracefully until a key is configured.
+- **Invalid or unavailable `GEMINI_MODEL_NAME`:** Set `GEMINI_MODEL_NAME` in `.env` to a Gemini model available to your API key. The default is `gemini-2.0-flash`.
+- **Missing Adzuna credentials:** `ADZUNA_APP_ID` and `ADZUNA_APP_KEY` are optional. If they are missing, JobPilot continues with free/fallback providers where available.
+- **Job URL import limitations:** Some pages are blocked, login-only, JavaScript-rendered, or too noisy to extract reliably. Paste the job description manually when import fails.
+- **CV PDF extraction limitations:** PDF import extracts selectable text only. Scanned PDFs are not OCR'd; paste the CV text manually if extraction fails.
+
+## License
+
+This project is available under the MIT License. See [LICENSE](LICENSE).
 
 ## Roadmap
 
